@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free WebP to PNG Batch Converter | High Quality | ConvertPixels</title>
+    <meta name="description" content="Free WebP to PNG batch converter. Choose Lossless or Optimized modes. Preserves transparency and runs 100% locally for total privacy. No watermarks.">
+    <link rel="canonical" href="https://convertpixels.org/webp-to-png">
+
+    <!-- Open Graph (Facebook, LinkedIn, Discord, etc.) -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://convertpixels.org/webp-to-png">
+    <meta property="og:title" content="Free WEBP to PNG Converter | Batch Convert 20+ Images Instantly">
+    <meta property="og:description" content="No watermarks, no quality loss. 100% private local processing. Free & instant.">
+    <meta property="og:image" content="https://convertpixels.org/webp-to-png/og-webp-to-png.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="ConvertPixels - Free batch WEBP to PNG converter with visual preview">
+    <meta property="og:site_name" content="ConvertPixels">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Free WEBP to PNG Converter | Batch Convert 20+ Images Instantly">
+    <meta name="twitter:description" content="No watermarks, no quality loss. 100% private local processing. Free & instant.">
+    <meta name="twitter:image" content="https://convertpixels.org/webp-to-png/og-webp-to-png.jpg">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="prefetch" href="upng.js">
+    <link rel="prefetch" href="pako.js">
+
+    <link rel="shortcut icon" href="/favicons/favicon.ico" type="image/x-icon">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-icon-180x180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/favicons/apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/favicons/apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/favicons/apple-icon-76x76.png">
+    <link rel="apple-touch-icon" href="/favicons/apple-icon.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/favicons/android-icon-512x512.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicons/android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="72x72" href="/favicons/android-icon-72x72.png">
+    <link rel="icon" type="image/png" sizes="36x36" href="/favicons/android-icon-36x36.png">
+    <meta name="msapplication-TileColor" content="#4fd1c5">
+    <meta name="msapplication-TileImage" content="/favicons/ms-icon-144x144.png">
+    <link rel="manifest" href="/favicons/manifest.json">
+    <meta name="theme-color" content="#4fd1c5">
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "ConvertPixels - WebP to PNG Batch Converter",
+        "operatingSystem": "All",
+        "applicationCategory": "MultimediaApplication",
+        "description": "Batch convert WebP to PNG while preserving transparency. Choose between lossless quality or optimized PNG. 100% private local processing, no watermarks.",
+        "url": "https://convertpixels.org/webp-to-png",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "featureList": [
+          "Batch conversion",
+          "Transparency Preservation",
+          "Lossless & Optimized modes",
+          "Private Local Processing",
+          "No Watermarks",
+          "Free"
+        ],
+        "screenshot": "https://convertpixels.org/webp-to-png/og-webp-to-png.jpg"
+      }
+      </script>
+</head>
+<body>
+
+  <nav style="height: 70px;">
+    <a href="https://convertpixels.org" class="logo" aria-label="ConvertPixels Home">CONVERTPIXELS</a>
+    <div class="batch-status" style="min-width: 150px;">Batch Mode: 20/20 active</div>
+</nav>
+
+    <main>
+        <h1>Free WEBP to PNG Batch Converter</h1>
+<p class="subtitle">Convert up to 20 images at once with <b>Pro Quality Settings</b>. 100% Free • No Watermarks • Private & Secure</p>
+        <button class="settings-collapse-btn" id="collapseBtn" title="Toggle settings" aria-label="Open conversion settings">
+          <span aria-hidden="true">⚙️</span>
+        </button>
+
+        <!-- Quality Toggle Section -->
+        <div class="quality-toggle-container collapsed" id="qualityToggleContainer">
+          <h2 class="quality-toggle-title">📊 PNG Output Settings</h2>
+          <p class="quality-toggle-description">
+              WebP is a highly compressed format. Converting to PNG will increase file size. Choose <strong>Best Quality</strong> for maximum fidelity or <strong>Optimized Size</strong> to reduce the inevitable file growth while keeping visuals crisp.
+          </p>
+          
+          <div class="quality-toggle" id="qualityToggle">
+              <div class="quality-slider" id="qualitySlider"></div>
+              <div class="quality-option active" id="optionBest" data-quality="1.0" role="button" tabindex="0" aria-label="Set to Best Quality">
+                <span>✨ Best Quality</span>
+              </div>
+              <div class="quality-option inactive" id="optionOptimized" data-quality="0.8" role="button" tabindex="0" aria-label="Set to Optimized Size">
+                <span>⚡ Optimized Size</span>
+             </div>
+          </div>
+      
+          <div class="quality-details" id="qualityDetails">
+              <div class="quality-detail-item">
+                  <span class="quality-label">Current Setting:</span>
+                  <span class="quality-value best" id="currentSetting">Lossless (100%)</span>
+              </div>
+              <div class="quality-detail-item">
+                  <span class="quality-label">File Size:</span>
+                  <span class="quality-value" id="fileSizeEstimate">Maximum (Will grow from WebP)</span>
+              </div>
+              <div class="quality-detail-item">
+                  <span class="quality-label">Format:</span>
+                  <span class="quality-value" id="compressionLevel">Standard 32-bit PNG</span>
+              </div>
+              <div class="quality-detail-item">
+                  <span class="quality-label">Best For:</span>
+                  <span class="quality-value" id="bestForUse">Photoshop, Printing, Archiving</span>
+              </div>
+          </div>
+          
+          <p class="quality-tip">
+              💡 <strong>Pro Tip:</strong> Use "Optimized Size" to keep the output PNG as close to the original WebP size as possible using smart 8-bit quantization.
+          </p>
+      </div>
+
+        <!-- Upload Area -->
+        <div class="dropzone" id="dropzone">
+            <div class="badge-10k">10K READY</div>
+            <p class="dropzone-text" aria-live="polite">Click or drag image to convert</p>
+            <span class="dropzone-hint">You can upload up to 20 images at a time</span>
+        </div>
+
+        <div class="preview-section" id="previewSection">
+            <div class="preview-header">
+                <h3>Selected Files <span id="fileCount" class="file-count" aria-live="polite">(0)</span></h3>
+                <button id="clearAllBtn" class="clear-btn" aria-label="Clear all selected files">Clear All</button>
+            </div>
+            <div class="preview-grid" id="previewGrid" aria-live="polite"></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-convert" id="convertBtn">Convert All</button>
+            <button class="btn-download" id="downloadBtn">Download All</button>
+        </div>
+    </main>
+
+    <!-- AFTER DOWNLOAD BUTTON, BEFORE FOOTER -->
+    <div class="seo-content-section">
+  
+      <h2 class="seo-main-heading">
+        <span class="emoji">⚡</span> Fast WebP to PNG Batch Converter <span class="emoji">⚡</span>
+      </h2>
+      
+      <div class="seo-card seo-what-is">
+        <h2 class="seo-subheading">
+          <span class="arrow">▸</span> Extract High-Quality PNG from WebP Files
+        </h2>
+        <p class="seo-paragraph">
+          ConvertPixels provides the fastest way to <strong>convert WebP to PNG</strong> while preserving maximum quality. Our specialized engine is built for <strong>batch processing</strong>, allowing you to handle up to <strong>20 WebP images at once</strong>. Whether you need PNG for professional editing or software compatibility, our <strong>WebP to PNG converter</strong> ensures perfect results instantly.
+        </p>
+      </div>
+      
+      <div class="seo-features">
+        <h3 class="seo-subheading center">
+          <span class="icon">🔧</span> Optimized for WebP Batch Processing
+        </h3>
+        
+        <div class="features-grid">
+          <div class="feature-card">
+            <h4 class="feature-title">🚀 20-WebP Batch Limit</h4>
+            <p class="feature-desc">
+              Stop converting one by one. Upload up to <strong>20 WebP files</strong> simultaneously and watch them convert to PNG in a single click.
+            </p>
+          </div>
+          
+          <div class="feature-card feature-card-blue">
+            <h4 class="feature-title">🛡️ Secure Browser Processing</h4>
+            <p class="feature-desc">
+              Your WebP files stay in your browser. We use <strong>local Web Workers</strong> to process your images, so your data is never uploaded to servers.
+            </p>
+          </div>
+          
+          <div class="feature-card feature-card-green">
+            <h4 class="feature-title">💯 No Watermarks</h4>
+            <p class="feature-desc">
+              Get professional, clean PNG files every time. We never add watermarks or hidden fees to your converted images.
+            </p>
+          </div>
+        </div>
+      </div>
+    
+      <div class="seo-card seo-pro-settings" style="background: rgba(59, 130, 246, 0.05); border: 1px dashed var(--primary);">
+        <h3 class="seo-subheading">
+          <span class="icon">⚙️</span> Advanced WebP to PNG Optimization
+        </h3>
+        <p class="seo-paragraph">
+          Need smaller PNG files? Our tool includes <strong>two conversion modes</strong>. Choose <strong>Lossless PNG</strong> for maximum quality and transparency, or <strong>Optimized 256-color PNG</strong> to reduce file growth while keeping visuals crisp—perfect for web compatibility.
+        </p>
+      </div>
+      
+      <div class="seo-card seo-how-to">
+        <h3 class="seo-subheading">
+          <span class="icon">📱</span> How to Batch Convert WebP to PNG
+        </h3>
+        
+        <div class="steps-container">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h4 class="step-title">Select 20 WebP Files</h4>
+              <p class="step-desc">Drag and drop your <strong>WebP files</strong> into the upload zone. You can select up to 20 images for <strong>batch conversion</strong>.</p>
+            </div>
+          </div>
+          
+          <div class="step">
+            <div class="step-number step-number-blue">2</div>
+            <div class="step-content">
+              <h4 class="step-title">Choose Quality Mode</h4>
+              <p class="step-desc">Select between <strong>Best Quality</strong> for lossless PNG or <strong>Optimized</strong> for smaller files before clicking convert.</p>
+            </div>
+          </div>
+          
+          <div class="step">
+            <div class="step-number step-number-green">3</div>
+            <div class="step-content">
+              <h4 class="step-title">Download PNG Files</h4>
+              <p class="step-desc">Once converted, your <strong>high-quality PNGs</strong> are ready. Download them all instantly with preserved transparency.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    
+      <div class="seo-faq">
+        <h3 class="seo-subheading center">
+          <span class="icon">❓</span> FAQ: WebP to PNG Conversion
+        </h3>
+        
+        <div class="faq-container">
+          <div class="faq-item">
+            <h4 class="faq-question">Will I lose transparency converting WebP to PNG?</h4>
+            <p class="faq-answer">No. Our converter <strong>preserves alpha transparency</strong> from WebP to PNG. Transparent backgrounds stay transparent in the output PNG files.</p>
+          </div>
+          
+          <div class="faq-item">
+            <h4 class="faq-question">What is the 256-color (Optimized) option?</h4>
+            <p class="faq-answer">It's a <strong>smart optimization</strong> that reduces PNG file size by limiting the palette to 256 colors. It keeps images looking sharp while minimizing the size increase from WebP.</p>
+          </div>
+    
+          <div class="faq-item">
+            <h4 class="faq-question">Why convert WebP to PNG if WebP is smaller?</h4>
+            <p class="faq-answer">For <strong>compatibility reasons</strong>. Some editing software, social media platforms, and older systems work better with PNG format. Our tool makes conversion seamless.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer-matrix">
+        <div class="matrix-grid">
+            <div class="matrix-column">
+                <h4>JPG Conversions</h4>
+                <a href="https://convertpixels.org/jpg-to-png">JPG to PNG</a>
+                <a href="https://convertpixels.org/jpg-to-webp">JPG to WEBP</a>
+                
+            </div>
+            <div class="matrix-column">
+                <h4>PNG Conversions</h4>
+                <a href="https://convertpixels.org/png-to-jpg">PNG to JPG</a>
+                <a href="https://convertpixels.org/png-to-webp">PNG to WEBP</a>
+                
+            </div>
+            <div class="matrix-column">
+                <h4>WEBP Conversions</h4>
+                <a href="https://convertpixels.org/webp-to-png" class="active">WEBP to PNG</a>
+                <a href="https://convertpixels.org/webp-to-jpg">WEBP to JPG</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Progress Modal -->
+    <div class="progress-modal" id="progressModal" role="dialog" aria-labelledby="modalTitle" aria-hidden="true">
+        <div class="modal-content">
+            <h3 id="modalTitle">Converting Files</h3>
+            <div class="progress-stats">
+                <span id="progressText" aria-live="polite">Processing 0 of 0</span>
+                <span id="progressPercent" aria-live="polite">0%</span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Conversion progress"></div>
+            </div>
+            <div class="progress-details">
+                <div class="detail-item">
+                    <span>Completed:</span>
+                    <span id="completedCount" aria-live="polite">0</span>
+                </div>
+                <div class="detail-item">
+                    <span>Failed:</span>
+                    <span id="failedCount" aria-live="polite">0</span>
+                </div>
+                <div class="detail-item">
+                    <span>Remaining:</span>
+                    <span id="remainingCount" aria-live="polite">0</span>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button id="cancelConversionBtn" class="btn-cancel">Cancel</button>
+                <button id="downloadAllBtn" class="btn-download">Download All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Container -->
+    <div class="alert-container" id="alertContainer" role="alert" aria-live="assertive"></div>
+
+</body>
+<script src="script.js" defer></script>
+</html>
