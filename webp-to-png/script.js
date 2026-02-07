@@ -449,8 +449,8 @@ window.qualityMode = 'best';// Global source of truth
 async function initConverter() {
     try {
         const [upngRes, pakoRes] = await Promise.all([
-            fetch('upng.js'),
-            fetch('pako.js')
+            fetch('/webp-to-png/upng.js'),
+            fetch('/webp-to-png/pako.js')
         ]);
         const upngCode = await upngRes.text();
         const pakoCode = await pakoRes.text();
@@ -1078,6 +1078,7 @@ collapseBtn.addEventListener('click', function() {
         localStorage.setItem('settingsExpanded', 'false');
     }
 });
+
 
 
 
