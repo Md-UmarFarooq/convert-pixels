@@ -216,11 +216,15 @@ function createFileCard(file, index) {
     if (isDone) card.classList.add('completed');
     if (isProcessing) card.classList.add('processing');
 
+    // ONE ICON FOR EVERYTHING - Simple, clean, works for all
+    const iconEmoji = '🖼️';
+
     card.innerHTML = `
         <button class="remove-file" title="Remove file">×</button>
         <div class="thumbnail-container">
+            <div class="file-icon">${iconEmoji}</div>
             <img src="" alt="${file.name}" class="preview-image" style="display: none;">
-            <div class="thumb-loader">Loading...</div>
+            <div class="thumb-loader" style="display: none;">Loading...</div>
         </div>
         <div class="preview-info">
             <div class="file-name" title="${file.name}">${shortenFileName(file.name)}</div>
@@ -233,28 +237,30 @@ function createFileCard(file, index) {
 
     const imgElement = card.querySelector('.preview-image');
     const loader = card.querySelector('.thumb-loader');
+    const iconElement = card.querySelector('.file-icon');
 
+    // When image loads, hide icon and show image
     imgElement.onload = () => {
+        iconElement.style.display = 'none';
         imgElement.style.display = 'block';
         loader.style.display = 'none';
     };
 
-    generatePreviewThumbnail(file, imgElement, loader);
+    // Generate preview in background
+    generatePreviewThumbnail(file, imgElement, loader, iconElement);
 
-    // --- FIX: Remove Logic ---
+    // Remove Logic
     card.querySelector('.remove-file').addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation();
-        // Use the current index from the dataset at the moment of click
         const idx = parseInt(card.dataset.index);
         removeFile(idx);
     });
     
-    // --- FIX: Convert/Download Logic ---
+    // Convert/Download Logic
     card.querySelector('.convert-single-btn').addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation();
         const idx = parseInt(card.dataset.index);
         
-        // Always check the LATEST status from the array using the current index
         const currentRes = conversionResults[idx];
         
         if (currentRes && currentRes.status === 'success') {
@@ -1079,7 +1085,6 @@ collapseBtn.addEventListener('click', function() {
         localStorage.setItem('settingsExpanded', 'false');
     }
 });
-
 
 
 
