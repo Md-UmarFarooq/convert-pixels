@@ -151,13 +151,13 @@ function handleNewFiles(newFiles, fileInput) {
 
 // ============ VALIDATE SINGLE FILE ============
 function validateFile(file) {
-    // Check file size - Still shows error immediately
+    // 1. Size Check
     if (file.size > maxFileSize) {
         showError(`${file.name} is too large (max 50MB)`);
         return { isValid: false, reason: 'size' };
     }
     
-    // Check file type - Still shows error immediately
+    // 2. Type Check
     const validTypes = ['image/webp'];
     const fileType = file.type.toLowerCase();
     if (!validTypes.some(type => fileType.includes(type.replace('image/', '')))) {
@@ -165,10 +165,10 @@ function validateFile(file) {
         return { isValid: false, reason: 'type' };
     }
     
-    // Check for duplicates - Returns reason without showing error
-    const isDuplicate = selectedFiles.some(f => 
-        f.name === file.name && f.size === file.size
-    );
+    // 3. THE COLLISION FIX:
+    // We check ONLY the name. If name exists, it's a duplicate.
+    // This protects your "Find-by-Name" logic used in updateFileCardStatus.
+    const isDuplicate = selectedFiles.some(f => f.name === file.name);
     
     if (isDuplicate) {
         return { isValid: false, reason: 'duplicate' };
@@ -444,13 +444,12 @@ async function convertSingleFile(index) {
 
 
 
-// 1. Keep your worker pool variable global but empty at first
 // ==========================================
 // 1. ENGINE STATE & WORKER SETUP
 // ==========================================
 let webpPngWorkers = [];
 let webpWorkerIndex = 0;
-window.qualityMode = 'best';// Global source of truth
+window.qualityMode = 'best'; // Global source of truth
 
 async function initConverter() {
     try {
@@ -471,66 +470,80 @@ async function initConverter() {
                 ${upngCode}
                 
                 self.onmessage = async (e) => {
+                    let bitmap = null;
+                    let canvas = null;
+                    let ctx = null;
+
                     try {
-                        const { blob, mode } = e.data;
-
-                        // WebP decode (native, fast, supports alpha)
-                        const bitmap = await createImageBitmap(blob);
-
-                        const canvas = new OffscreenCanvas(
-                            bitmap.width,
-                            bitmap.height
-                        );
-                        const ctx = canvas.getContext("2d", { alpha: true });
+                        const { buffer, mode } = e.data;
+                        
+                        // 1. Reconstruct image from the transferred buffer
+                        const blob = new Blob([buffer]);
+                        bitmap = await createImageBitmap(blob);
+                        
+                        // 2. Setup OffscreenCanvas with performance flags
+                        canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+                        ctx = canvas.getContext("2d", { 
+                            alpha: true,  // PNG supports transparency
+                            desynchronized: true // 🔥 Low-latency rendering
+                        });
+                        
+                        // 3. 1:1 Pixel Mapping (Fastest possible draw)
+                        ctx.imageSmoothingEnabled = false; 
                         ctx.drawImage(bitmap, 0, 0);
+                        
+                        // 4. 🔥 IMMEDIATE MEMORY RELEASE: Close source bitmap
+                        bitmap.close();
+                        bitmap = null;
 
-                        let finalBlob;
+                        let finalBuffer;
 
                         if (mode === 'optimized') {
-                            // PNG optimization (256 colors)
+                            // PNG optimization (256 colors) - Uses UPNG
                             const imageData = ctx.getImageData(
-                                0, 0, bitmap.width, bitmap.height
+                                0, 0, canvas.width, canvas.height
                             ).data;
 
-                            const arrayBuffer = UPNG.encode(
+                            finalBuffer = UPNG.encode(
                                 [imageData.buffer],
-                                bitmap.width,
-                                bitmap.height,
+                                canvas.width,
+                                canvas.height,
                                 256
-                            );
-
-                            finalBlob = new Blob(
-                                [arrayBuffer],
-                                { type: "image/png" }
                             );
                         } else {
                             // Best quality: lossless PNG
-                            finalBlob = await canvas.convertToBlob({
+                            const pngBlob = await canvas.convertToBlob({
                                 type: "image/png"
                             });
+                            finalBuffer = await pngBlob.arrayBuffer();
                         }
 
-                        bitmap.close();
-                        self.postMessage(finalBlob);
-                        // ... after finalBlob is generated ...
-                       // ADD THESE 3 LINES EXACTLY HERE:
-                       ctx.clearRect(0, 0, canvas.width, canvas.height); 
-                       canvas.width = 1; 
-                       canvas.height = 1;
+                        // 5. 🔥 GPU CLEANUP: Reset canvas to flush VRAM
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        canvas.width = 1;
+                        canvas.height = 1;
+
+                        // 6. 🔥 ZERO-COPY RETURN: Transfer buffer back to Main Thread
+                        self.postMessage({ buffer: finalBuffer }, [finalBuffer]);
 
                     } catch (err) {
+                        if (bitmap) bitmap.close();
                         self.postMessage({ error: err.message });
                     }
                 };
             `;
-            const worker = new Worker(
-                URL.createObjectURL(
-                    new Blob([workerCode], { type: "application/javascript" })
-                )
+
+            const workerUrl = URL.createObjectURL(
+                new Blob([workerCode], { type: "application/javascript" })
             );
+            const worker = new Worker(workerUrl);
+            
+            // Clean up the temporary URL immediately
+            URL.revokeObjectURL(workerUrl);
+            
             webpPngWorkers.push(worker);
         }
-        console.log("Converter Engine Ready.");
+        console.log("WebP → PNG Optimized Engine Ready.");
     } catch (err) {
         console.error("Failed to start converter:", err);
     }
@@ -599,23 +612,39 @@ cp_updateUI('best');
 // 3. THE FINAL CONVERSION CALL
 // ==========================================
 function convertWebpToPngSimple(webpBlob) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         if (webpPngWorkers.length === 0)
             return reject("Engine loading...");
 
-        const worker = webpPngWorkers[webpWorkerIndex];
-        webpWorkerIndex = (webpWorkerIndex + 1) % webpPngWorkers.length;
+        try {
+            // 🔥 DEEP OPTIMIZATION: Pre-convert to ArrayBuffer for transfer
+            const arrayBuffer = await webpBlob.arrayBuffer();
+            
+            const worker = webpPngWorkers[webpWorkerIndex];
+            webpWorkerIndex = (webpWorkerIndex + 1) % webpPngWorkers.length;
 
-        worker.onmessage = (e) => {
-            if (e.data?.error) reject(e.data.error);
-            else resolve(e.data);
-        };
+            worker.onmessage = (e) => {
+                // Clear handler to prevent memory leaks
+                worker.onmessage = null;
+                
+                if (e.data?.error) {
+                    reject(e.data.error);
+                } else {
+                    // 🔥 RECONSTRUCT BLOB from transferred buffer
+                    const blob = new Blob([e.data.buffer], { type: 'image/png' });
+                    resolve(blob);
+                }
+            };
 
-        // blob = WebP, output = PNG
-        worker.postMessage({
-            blob: webpBlob,
-            mode: window.qualityMode
-        });
+            // 🔥 TRANSFERABLE: Transfer buffer to worker (zero-copy)
+            worker.postMessage({ 
+                buffer: arrayBuffer, 
+                mode: window.qualityMode 
+            }, [arrayBuffer]);
+
+        } catch (e) {
+            reject("Read error: " + e.message);
+        }
     });
 }
 
@@ -844,11 +873,33 @@ var cancelAllBtn=document.querySelector(".btn-cancel");
 cancelAllBtn.addEventListener("click",cancelAllConversions);
 
 function cancelAllConversions() {
-    isConverting = false; // Stops the loop in startBatchConversion
+    // 1. Force the batch loop to stop immediately
+    isConverting = false; 
     
+    // ============ THE FIX: SAFE WORKER TERMINATION ============
+    // Check if the array exists and actually has workers in it
+    if (Array.isArray(webpPngWorkers) && webpPngWorkers.length > 0) {
+        // Instantly stop all background CPU processing
+        webpPngWorkers.forEach(worker => {
+            if (worker instanceof Worker) {
+                worker.terminate();
+            }
+        });
+        
+        // Clear the array of dead workers
+        webpPngWorkers = [];
+        
+        // Reset the worker pool index to avoid out-of-bounds errors
+        webpWorkerIndex = 0;
+        
+        // Restart the engine fresh for the next use
+        initConverter();
+    }
+    // ======================================================
+
     hideProgressModal();
     
-    // Reset Main Button
+    // Reset Main Button UI
     const convertBtn = document.getElementById('convertBtn');
     if (convertBtn) {
         convertBtn.disabled = false;
@@ -857,13 +908,15 @@ function cancelAllConversions() {
     }
 
     // Reset UI cards but KEEP existing success results
-    selectedFiles.forEach((_, index) => {
-        const result = conversionResults[index];
-        // If it wasn't finished, set it back to 'pending'
-        if (!result || result.status !== 'success') {
-            updateFileCardStatus(index, 'pending');
-        }
-    });
+    if (Array.isArray(selectedFiles)) {
+        selectedFiles.forEach((_, index) => {
+            const result = conversionResults[index];
+            // If it wasn't finished, set it back to 'pending'
+            if (!result || result.status !== 'success') {
+                updateFileCardStatus(index, 'pending');
+            }
+        });
+    }
     
     showMessage('Process stopped');
 }
