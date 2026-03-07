@@ -151,13 +151,13 @@ function handleNewFiles(newFiles, fileInput) {
 
 // ============ VALIDATE SINGLE FILE ============
 function validateFile(file) {
-    // Check file size - Still shows error immediately
+    // 1. Size Check
     if (file.size > maxFileSize) {
         showError(`${file.name} is too large (max 50MB)`);
         return { isValid: false, reason: 'size' };
     }
     
-    // Check file type - Still shows error immediately
+    // 2. Type Check
     const validTypes = ['image/jpeg', 'image/jpg'];
     const fileType = file.type.toLowerCase();
     if (!validTypes.some(type => fileType.includes(type.replace('image/', '')))) {
@@ -165,10 +165,10 @@ function validateFile(file) {
         return { isValid: false, reason: 'type' };
     }
     
-    // Check for duplicates - Returns reason without showing error
-    const isDuplicate = selectedFiles.some(f => 
-        f.name === file.name && f.size === file.size
-    );
+    // 3. THE COLLISION FIX:
+    // We check ONLY the name. If name exists, it's a duplicate.
+    // This protects your "Find-by-Name" logic used in updateFileCardStatus.
+    const isDuplicate = selectedFiles.some(f => f.name === file.name);
     
     if (isDuplicate) {
         return { isValid: false, reason: 'duplicate' };
@@ -489,34 +489,44 @@ async function initConverter() {
                 
                 self.onmessage = async (e) => {
                     try {
-                        const { blob, mode } = e.data;
+                        const { buffer, mode } = e.data;
+                        // Convert buffer back to blob for bitmap
+                        const blob = new Blob([buffer]);
                         const bitmap = await createImageBitmap(blob);
+                        
                         const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-                        const ctx = canvas.getContext("2d");
+                        const ctx = canvas.getContext("2d", { 
+                            alpha: true, 
+                            desynchronized: true // 🔥 DEEP OPTIMIZATION: Reduces latency
+                        });
+                        
+                        ctx.imageSmoothingEnabled = false; // 🔥 Speed up draw
                         ctx.drawImage(bitmap, 0, 0);
                         
-                        let finalBlob;
+                        let finalBuffer;
                         if (mode === 'optimized') {
                             const imageData = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
-                            const arrayBuffer = UPNG.encode([imageData.buffer], bitmap.width, bitmap.height, 256);
-                            finalBlob = new Blob([arrayBuffer], { type: "image/png" });
+                            finalBuffer = UPNG.encode([imageData.buffer], bitmap.width, bitmap.height, 256);
                         } else {
-                            finalBlob = await canvas.convertToBlob({ type: "image/png" });
+                            const finalBlob = await canvas.convertToBlob({ type: "image/png" });
+                            finalBuffer = await finalBlob.arrayBuffer();
                         }
 
                         bitmap.close();
-                        self.postMessage(finalBlob);
-                        // ... after finalBlob is generated ...
-                       // ADD THESE 3 LINES EXACTLY HERE:
-                       ctx.clearRect(0, 0, canvas.width, canvas.height); 
-                       canvas.width = 1; 
-                       canvas.height = 1;
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        canvas.width = 1;
+                        canvas.height = 1;
+
+                        self.postMessage({ buffer: finalBuffer }, [finalBuffer]);
+
                     } catch (err) {
                         self.postMessage({ error: err.message });
                     }
                 };
             `;
-            const worker = new Worker(URL.createObjectURL(new Blob([workerCode], { type: "application/javascript" })));
+            const workerUrl = URL.createObjectURL(new Blob([workerCode], { type: "application/javascript" }));
+            const worker = new Worker(workerUrl);
+            URL.revokeObjectURL(workerUrl);
             jpgPngWorkers.push(worker);
         }
         console.log("Converter Engine Ready.");
@@ -585,22 +595,35 @@ cp_updateUI('best');
 // 3. THE FINAL CONVERSION CALL
 // ==========================================
 function convertJpgToPngSimple(jpgBlob) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         if (jpgPngWorkers.length === 0) return reject("Engine loading...");
 
-        const worker = jpgPngWorkers[jpgWorkerIndex];
-        jpgWorkerIndex = (jpgWorkerIndex + 1) % jpgPngWorkers.length;
+        try {
+            // 🔥 DEEP OPTIMIZATION: Pre-convert to ArrayBuffer
+            const arrayBuffer = await jpgBlob.arrayBuffer();
+            
+            const worker = jpgPngWorkers[jpgWorkerIndex];
+            jpgWorkerIndex = (jpgWorkerIndex + 1) % jpgPngWorkers.length;
 
-        worker.onmessage = (e) => {
-            if (e.data?.error) reject(e.data.error);
-            else resolve(e.data);
-        };
+            worker.onmessage = (e) => {
+                if (e.data?.error) {
+                    reject(e.data.error);
+                } else {
+                    const blob = new Blob([e.data.buffer], { type: 'image/png' });
+                    resolve(blob);
+                }
+            };
 
-        // Pass the blob AND the current UI mode to the worker
-        worker.postMessage({ 
-            blob: jpgBlob, 
-            mode: window.qualityMode 
-        });
+            // 🔥 TRANSFERABLE: Use the second argument to transfer the buffer
+            // This makes the data disappear from the Main Thread and appear in the Worker
+            worker.postMessage({ 
+                buffer: arrayBuffer, 
+                mode: window.qualityMode 
+            }, [arrayBuffer]);
+
+        } catch (e) {
+            reject("Read error: " + e.message);
+        }
     });
 }
 
@@ -845,11 +868,33 @@ var cancelAllBtn=document.querySelector(".btn-cancel");
 cancelAllBtn.addEventListener("click",cancelAllConversions);
 
 function cancelAllConversions() {
-    isConverting = false; // Stops the loop in startBatchConversion
+    // 1. Force the batch loop to stop immediately
+    isConverting = false; 
     
+    // ============ THE FIX: SAFE WORKER TERMINATION ============
+    // Check if the array exists and actually has workers in it
+    if (Array.isArray(jpgPngWorkers) && jpgPngWorkers.length > 0) {
+        // Instantly stop all background CPU processing
+        jpgPngWorkers.forEach(worker => {
+            if (worker instanceof Worker) {
+                worker.terminate();
+            }
+        });
+        
+        // Clear the array of dead workers
+        jpgPngWorkers = [];
+        
+        // Reset the worker pool index to avoid out-of-bounds errors
+        jpgWorkerIndex = 0;
+        
+        // Restart the engine fresh for the next use
+        initConverter();
+    }
+    // ======================================================
+
     hideProgressModal();
     
-    // Reset Main Button
+    // Reset Main Button UI
     const convertBtn = document.getElementById('convertBtn');
     if (convertBtn) {
         convertBtn.disabled = false;
@@ -858,13 +903,15 @@ function cancelAllConversions() {
     }
 
     // Reset UI cards but KEEP existing success results
-    selectedFiles.forEach((_, index) => {
-        const result = conversionResults[index];
-        // If it wasn't finished, set it back to 'pending'
-        if (!result || result.status !== 'success') {
-            updateFileCardStatus(index, 'pending');
-        }
-    });
+    if (Array.isArray(selectedFiles)) {
+        selectedFiles.forEach((_, index) => {
+            const result = conversionResults[index];
+            // If it wasn't finished, set it back to 'pending'
+            if (!result || result.status !== 'success') {
+                updateFileCardStatus(index, 'pending');
+            }
+        });
+    }
     
     showMessage('Process stopped');
 }
