@@ -1567,3 +1567,20 @@ input, select {
     font-size: 0.85rem;
     line-height: 1.5;
 }
+
+/* Make legal links slightly more subtle than tool links */
+.utility-col a {
+    opacity: 0.8;
+    font-size: 0.9rem; /* Slightly smaller than tool links */
+}
+
+.utility-col a:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+/* Ensure the heading matches your other columns for consistency */
+.utility-col h4 {
+    color: var(--primary); /* Keep your brand color here */
+    letter-spacing: 0.05em;
+}
