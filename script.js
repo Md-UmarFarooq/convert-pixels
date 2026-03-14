@@ -9,7 +9,6 @@ const tools = [
 ];
 
 // DOM Elements
-const exploreBtn = document.getElementById('exploreBtn');
 const toolsGridContainer = document.getElementById('toolsGridContainer');
 const toolsGrid = document.getElementById('toolsGrid');
 const searchBar = document.getElementById('searchBar');
@@ -99,57 +98,6 @@ function updateSearchResults(visibleCount, searchTerm) {
     }
 }
 
-// Initialize tools grid
-function initializeToolsGrid() {
-    toolsGrid.innerHTML = '';
-    
-    tools.forEach((tool, index) => {
-        const toolCard = document.createElement('a');
-        toolCard.href = tool.url;
-        toolCard.className = 'tool-card fade-in-up';
-        toolCard.setAttribute('data-title', tool.title.toLowerCase());
-        toolCard.setAttribute('data-description', tool.description.toLowerCase());
-        toolCard.setAttribute('data-category', tool.category);
-        toolCard.setAttribute('data-original-index', index);
-        toolCard.style.animationDelay = `${index * 0.05}s`;
-        
-        toolCard.innerHTML = `
-            <div class="tool-emoji">${tool.emoji}</div>
-            <h3 class="tool-title">${tool.title}</h3>
-            <p class="tool-description">${tool.description}</p>
-        `;
-        
-        toolsGrid.appendChild(toolCard);
-    });
-}
-
-// Explore button click handler
-exploreBtn.addEventListener('click', function() {
-    const isExpanded = toolsGridContainer.classList.contains('expanded');
-    
-    if (isExpanded) {
-        this.classList.remove('rotated');
-        toolsGridContainer.classList.remove('expanded');
-        // Clear search when manually closing
-        if (searchBar.value.trim() === '') {
-            searchBar.value = '';
-            filterTools('');
-            updateSearchResults(0, '');
-        }
-    } else {
-        this.classList.add('rotated');
-        toolsGridContainer.classList.add('expanded');
-        
-        if (toolsGrid.children.length === 0) {
-            initializeToolsGrid();
-        }
-        
-        // PERFECT SCROLLING
-        setTimeout(() => {
-            scrollToElementPerfectly(toolsGridContainer);
-        }, 180);
-    }
-});
 
 // ENHANCED filterTools function with BETTER highlighting
 function filterTools(searchTerm) {
@@ -275,17 +223,10 @@ searchBar.addEventListener('input', function() {
         // User is searching
         if (searchTerm.length > 0) {
             isSearchActive = true;
-            
-            // Expand tools if not already expanded
-            if (!toolsGridContainer.classList.contains('expanded')) {
-                exploreBtn.classList.add('rotated');
-                toolsGridContainer.classList.add('expanded');
-                
-                if (toolsGrid.children.length === 0) {
-                    initializeToolsGrid();
-                }
-            }
-            
+            toolsGridContainer.style.maxHeight = 'none';
+            toolsGridContainer.style.overflow = 'visible';
+            if (loadMoreWrapper) loadMoreWrapper.style.display = 'none';
+
             // Filter tools
             const visibleCount = filterTools(searchTerm);
             
@@ -310,6 +251,7 @@ searchBar.addEventListener('input', function() {
             isSearchActive = false;
             filterTools('');
             updateSearchResults(0, '');
+            applyGridClip();
             
             // DON'T auto-scroll when clearing - better UX!
             // User stays where they are to continue browsing
@@ -325,6 +267,7 @@ searchBar.addEventListener('keydown', function(e) {
         updateSearchResults(0, '');
         this.blur();
         isSearchActive = false;
+        applyGridClip();
         
         // Don't auto-scroll - user stays where they are
     }
@@ -386,7 +329,6 @@ const fullPlaceholder = `Minimum ${MIN_CHARS} characters required. Describe what
 
 // THE GUARD
 if (!isInputValid(requestText)) {
-    console.log("❌ Validation failed.");
     
     requestInput.style.borderColor = '#ef4444'; // Red
     requestInput.style.animation = 'shake 0.5s';
@@ -423,7 +365,6 @@ if (sendBtn) {
 requestInput.classList.add('sending-mode');
 
 // 3. SUCCESS PATH
-console.log("✅ Validation passed. Sending request...");
 
 let templateParams = {
     to_email: "techpc.u2005@gmail.com",
@@ -432,7 +373,6 @@ let templateParams = {
 
 emailjs.send("service_sklywbd", "template_qy6e6za", templateParams)
     .then(response => {
-        console.log("✅ Email sent!", response);
         if (sendBtn) {
             sendBtn.disabled = false;
             sendBtn.innerHTML = "Send Request"; 
@@ -455,7 +395,6 @@ emailjs.send("service_sklywbd", "template_qy6e6za", templateParams)
         }
     })
     .catch(error => {
-        console.log("❌ EmailJS failed", error);
         alert("Something went wrong. Please check your internet connection and try again.");
     });
 });
@@ -563,9 +502,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.style.opacity = '1';
     }, 100);
     
-    setTimeout(() => {
-        searchBar.focus();
-    }, 800);
+});
+
+window.addEventListener('load', function() {
+    initLoadMore();
 });
 
 function adjustHeroSpacing() {
@@ -585,3 +525,106 @@ function adjustHeroSpacing() {
     // Run on load and resize
     window.addEventListener('load', adjustHeroSpacing);
     window.addEventListener('resize', adjustHeroSpacing);
+
+const loadMoreBtn = document.getElementById('loadMoreBtn');
+const loadMoreWrapper = document.getElementById('loadMoreWrapper');
+let unlockedCount = 0;
+
+function getColsPerRow() {
+    // Ask the browser what it actually rendered — no guessing
+    const gridStyle = getComputedStyle(toolsGrid);
+    const cols = gridStyle.gridTemplateColumns.split(' ').length;
+    return cols || 1;
+}
+
+function getInitialVisible() {
+    return getColsPerRow() * 2;
+}
+
+function applyGridClip() {
+    if (isSearchActive) {
+        toolsGridContainer.style.maxHeight = 'none';
+        toolsGridContainer.style.overflow = 'visible';
+        if (loadMoreWrapper) loadMoreWrapper.style.display = 'none';
+        return;
+    }
+
+    const allCards = Array.from(toolsGrid.querySelectorAll('.tool-card:not(.filtered-out)'));
+    const totalCards = allCards.length;
+
+    if (unlockedCount >= totalCards) {
+        toolsGridContainer.style.maxHeight = 'none';
+        toolsGridContainer.style.overflow = 'visible';
+        if (loadMoreWrapper) loadMoreWrapper.style.display = 'none';
+        return;
+    }
+
+    // Temporarily remove clip so all cards have real dimensions
+    toolsGridContainer.style.maxHeight = 'none';
+    toolsGridContainer.style.overflow = 'visible';
+
+    // Force browser to finish layout before measuring
+    void toolsGrid.offsetHeight;
+
+    const cols = getColsPerRow();
+    const rowsToShow = Math.ceil(unlockedCount / cols);
+    const gridGap = parseInt(getComputedStyle(toolsGrid).rowGap) || 32;
+
+    // Find the tallest card in each row and sum them
+    let totalHeight = 0;
+    for (let row = 0; row < rowsToShow; row++) {
+        let rowMaxHeight = 0;
+        for (let col = 0; col < cols; col++) {
+            const cardIndex = row * cols + col;
+            const card = allCards[cardIndex];
+            if (card) {
+                const h = card.getBoundingClientRect().height;
+                if (h > rowMaxHeight) rowMaxHeight = h;
+            }
+        }
+        totalHeight += rowMaxHeight;
+    }
+
+    // Add gaps + buffer for subpixel rounding
+    const clipHeight = totalHeight + (rowsToShow - 1) * gridGap + 8;
+
+    toolsGridContainer.style.maxHeight = clipHeight + 'px';
+    toolsGridContainer.style.overflow = 'hidden';
+    if (loadMoreWrapper) loadMoreWrapper.style.display = 'block';
+}
+
+function initLoadMore() {
+    unlockedCount = getInitialVisible();
+    applyGridClip();
+}
+
+if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', function() {
+        const allCards = Array.from(toolsGrid.querySelectorAll('.tool-card:not(.filtered-out)'));
+        const totalCards = allCards.length;
+
+        unlockedCount += getInitialVisible(); // reveal same amount as initial
+
+        toolsGridContainer.style.transition = 'max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+        applyGridClip();
+        setTimeout(() => { toolsGridContainer.style.transition = ''; }, 500);
+
+        if (unlockedCount >= totalCards) {
+            loadMoreBtn.textContent = 'All Tools Loaded ✓';
+            setTimeout(() => {
+                if (loadMoreWrapper) loadMoreWrapper.style.display = 'none';
+            }, 800);
+        }
+    });
+}
+
+let resizeTimer;
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+        if (!isSearchActive) {
+            requestAnimationFrame(applyGridClip);
+        }
+    }, 150);
+});
+
