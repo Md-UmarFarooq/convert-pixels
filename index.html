@@ -256,84 +256,42 @@
             font-size: 0.95rem;
             line-height: 1.6;
         }
-        
-        /* ===== 3. IMPROVED Tool Trigger ===== */
-        .tool-trigger-section {
-            padding: 4rem 2rem;
-            text-align: center;
-            max-width: 900px;
-            margin: 0 auto;
-            position: relative;
-        }
-        
-        .explore-btn {
-            position: relative;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border: none;
-            border-radius: 16px;
-            padding: 20px 42px;
-            font-size: 1.2rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); /* Faster animation */
-            margin: 2.5rem auto;
-            display: inline-flex;
-            align-items: center;
-            gap: 1rem;
-            box-shadow: 0 8px 30px rgba(59, 130, 246, 0.25);
-            overflow: hidden;
-        }
-        
-        .explore-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: 0.5s;
-        }
-        
-        .explore-btn:hover::before {
-            left: 100%;
-        }
-        
-        .explore-btn:hover {
-            transform: translateY(-4px) scale(1.05);
-            box-shadow: 0 15px 40px rgba(59, 130, 246, 0.35);
-        }
-        
-        .explore-btn:active {
-            transform: translateY(-1px) scale(0.98);
-        }
-        
-        .btn-icon {
-            transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* Faster */
-        }
-        
-        /* IMPROVED ROTATION ANIMATION */
-        .explore-btn.rotated .btn-icon {
-            transform: rotate(90deg) scale(1.1);
-        }
-        
-        /* Glowing effect for active state */
-        .explore-btn.rotated {
-            background: linear-gradient(135deg, var(--success), #059669);
-            box-shadow: 0 8px 30px rgba(16, 185, 129, 0.25);
-        }
-        
-        .explore-btn.rotated:hover {
-            box-shadow: 0 15px 40px rgba(16, 185, 129, 0.35);
-        }
+
+        /* ===== Tools Intro Section - Simple ===== */
+.tools-intro {
+    padding: 3rem 2rem 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.tools-intro .section-title {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--primary);
+    letter-spacing: -0.02em;
+}
+
+.tools-intro .section-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+.tools-intro .title-accent {
+    width: 60px;
+    height: 3px;
+    background: var(--primary);
+    margin: 0 auto;
+    border-radius: 2px;
+}
         
         /* ===== 4. Tools Grid ===== */
         .tools-section {
             padding: 0 2rem 6rem;
             max-width: 1200px;
             margin: 0 auto;
-            overflow: hidden;
         }
         
         .tools-grid-container {
@@ -345,7 +303,6 @@
         }
         
         .tools-grid-container.expanded {
-            max-height: 5000px;
             opacity: 1;
             margin-top: 3rem;
             animation: toolsExpand 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; /* Faster */
@@ -878,11 +835,6 @@
                 font-size: 1rem;
             }
             
-            .explore-btn {
-                padding: 18px 32px;
-                font-size: 1.1rem;
-            }
-            
             .tools-grid {
                 grid-template-columns: 1fr;
             }
@@ -1219,6 +1171,48 @@
     pointer-events: none;
 }
 
+/* ===== Load More ===== */
+.tool-card--hidden {
+    display: none;
+}
+
+.tool-card--hidden.revealed {
+    display: block;
+}
+
+.load-more-wrapper {
+    text-align: center;
+    margin-top: 2.5rem;
+}
+
+.load-more-btn {
+    background: transparent;
+    color: var(--primary);
+    border: 1.5px solid var(--primary);
+    border-radius: 10px;
+    padding: 14px 36px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.01em;
+}
+
+.load-more-btn:hover {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.25);
+    transform: translateY(-2px);
+}
+
+.load-more-btn:active {
+    transform: translateY(0);
+}
+
+.load-more-btn.hidden {
+    display: none;
+}
 
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js" defer></script>
@@ -1231,8 +1225,8 @@
     <header class="top-bar">
         <a href="https://convertpixels.org" class="brand">CONVERTPIXELS</a>
         <div class="search-container">
-            <span class="search-icon">🔍</span>
-            <input type="text" class="search-bar" placeholder="Search for tools (JPG to PNG, HEX to RGB, etc.)" id="searchBar">
+            <span class="search-icon" aria-hidden="true">🔍</span>
+            <input type="text" class="search-bar" placeholder="Search for tools (JPG to PNG, HEX to RGB, etc.)" id="searchBar" aria-label="Search through all available conversion tools">
         </div>
     </header>
 
@@ -1262,24 +1256,99 @@
         </div>
     </section>
 
-    <!-- 3. IMPROVED Tool Trigger -->
-    <section class="tool-trigger-section">
+    <section class="tools-intro">
         <h2 class="section-title">Explore All Tools</h2>
-        <p class="section-subtitle">Click below to access our specialized tools for file conversion, optimization, and batch processing.</p>
-        
-        <button class="explore-btn" id="exploreBtn">
-            <span class="btn-icon">✨</span>
-            Explore All Tools
-        </button>
+        <p class="section-subtitle">
+            Browser-based, private, and completely free.
+        </p>
     </section>
 
     <!-- 4. Tools Grid -->
     <section class="tools-section">
-        <div class="search-results-info" id="searchResultsInfo"></div>
-        <div class="tools-grid-container" id="toolsGridContainer">
+        <div class="search-results-info" id="searchResultsInfo" aria-live="polite"></div>
+        <div class="tools-grid-container expanded" id="toolsGridContainer" role="region" aria-label="Conversion Tools Grid">
             <div class="tools-grid" id="toolsGrid">
-                <!-- Tools will be dynamically added here -->
+                <a href="https://convertpixels.org/jpg-to-png" 
+                   class="tool-card fade-in-up" 
+                   role="link"
+                   aria-label="Launch JPG to PNG Batch Converter"
+                   data-title="jpg to png batch" 
+                   data-description="multi-threaded local conversion. choose best quality for lossless assets or optimized 8-bit pngs using intelligent quantization." 
+                   data-category="image-to-image" 
+                   data-original-index="0">
+                    <div class="tool-emoji" aria-hidden="true">🖼️</div>
+                    <h3 class="tool-title">JPG to PNG Batch</h3>
+                    <p class="tool-description">Multi-threaded local conversion. Choose Best Quality for lossless assets or Optimized 8-bit PNGs using intelligent quantization.</p>
+                </a>
+            
+                <a href="https://convertpixels.org/png-to-jpg" 
+                   class="tool-card fade-in-up" 
+                   role="link"
+                   aria-label="Launch PNG to JPG Batch Converter"
+                   data-title="png to jpg batch" 
+                   data-description="instant browser-based processing. convert up to 20 pngs to high-quality jpgs without ever uploading a single byte to a server." 
+                   data-category="image-to-image" 
+                   data-original-index="1">
+                    <div class="tool-emoji" aria-hidden="true">🖼️</div>
+                    <h3 class="tool-title">PNG to JPG Batch</h3>
+                    <p class="tool-description">Instant browser-based processing. Convert up to 20 PNGs to high-quality JPGs without ever uploading a single byte to a server.</p>
+                </a>
+            
+                <a href="https://convertpixels.org/webp-to-png" 
+                   class="tool-card fade-in-up"  
+                   role="link"
+                   aria-label="Launch WEBP to PNG Batch Converter"
+                   data-title="webp to png batch" 
+                   data-description="high-speed worker-driven conversion. turn modern webp files into universal pngs while preserving alpha transparency and quality." 
+                   data-category="image-to-image" 
+                   data-original-index="2">
+                    <div class="tool-emoji" aria-hidden="true">🖼️</div>
+                    <h3 class="tool-title">WEBP to PNG Batch</h3>
+                    <p class="tool-description">High-speed worker-driven conversion. Turn modern WebP files into universal PNGs while preserving alpha transparency and quality.</p>
+                </a>
+            
+                <a href="https://convertpixels.org/jpg-to-webp" 
+                   class="tool-card fade-in-up" 
+                   role="link"
+                   aria-label="Launch JPG to WEBP Batch Converter"
+                   data-title="jpg to webp batch" 
+                   data-description="the ultimate web optimization tool. convert jpg to webp for faster site speeds using multi-core processing on your own device." 
+                   data-category="image-to-image" 
+                   data-original-index="3">
+                    <div class="tool-emoji" aria-hidden="true">🖼️</div>
+                    <h3 class="tool-title">JPG to WEBP Batch</h3>
+                    <p class="tool-description">The ultimate web optimization tool. Convert JPG to WebP for faster site speeds using multi-core processing on your own device.</p>
+                </a>
+            
+                <a href="https://convertpixels.org/png-to-webp" 
+                   class="tool-card fade-in-up" 
+                   role="link"
+                   aria-label="Launch PNG to WEBP Batch Converter"
+                   data-title="png to webp batch" 
+                   data-description="advanced high-performance compression. keep your transparency but cut file sizes by 70% with client-side quantization logic." 
+                   data-category="image-to-image" 
+                   data-original-index="4">
+                    <div class="tool-emoji" aria-hidden="true">🖼️</div>
+                    <h3 class="tool-title">PNG to WEBP Batch</h3>
+                    <p class="tool-description">Advanced high-performance compression. Keep your transparency but cut file sizes by 70% with client-side quantization logic.</p>
+                </a>
+            
+                <a href="https://convertpixels.org/webp-to-jpg" 
+                   class="tool-card fade-in-up" 
+                   role="link"
+                   aria-label="Launch WEBP to JPG Batch Converter"
+                   data-title="webp to jpg batch" 
+                   data-description="fast, local conversion to standard jpg format. process batch images in seconds with dedicated workers for maximum performance." 
+                   data-category="image-to-image" 
+                   data-original-index="5">
+                    <div class="tool-emoji" aria-hidden="true">🖼️</div>
+                    <h3 class="tool-title">WEBP to JPG Batch</h3>
+                    <p class="tool-description">Fast, local conversion to standard JPG format. Process batch images in seconds with dedicated workers for maximum performance.</p>
+                </a>
             </div>
+        </div>
+        <div class="load-more-wrapper" id="loadMoreWrapper">
+            <button class="load-more-btn" id="loadMoreBtn">Load More Tools</button>
         </div>
     </section>
 
@@ -1292,7 +1361,8 @@
         
         <form class="request-form" id="requestForm">
             <textarea 
-                class="request-input" 
+                class="request-input"
+                aria-label="Describe the tool you want me to build" 
                 placeholder="Minimum 20 characters required. Describe what the tool should do, supported file formats, technical limitations, preferred workflow, and your email." 
                 required
             ></textarea>
@@ -1365,7 +1435,7 @@
     </footer>
     <!-- Improved Request Success Message -->
 <div class="success-overlay" id="successOverlay"></div>
-<div class="request-success-message" id="successMessage">
+<div class="request-success-message" id="successMessage" role="dialog" aria-modal="true">
     <div class="envelope-icon">✉️</div>
     <h3>Request Received! ✨</h3>
     <div class="request-success-content">
@@ -1375,7 +1445,7 @@
     <div class="request-success-signature">
         Stay tuned!
     </div>
-    <button class="close-success-btn" id="closeSuccessBtn">
+    <button class="close-success-btn" id="closeSuccessBtn" aria-label="Close success message">
         <span>🎉 Got it!</span>
     </button>
 </div>
