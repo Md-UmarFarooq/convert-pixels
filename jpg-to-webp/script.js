@@ -660,6 +660,7 @@ async function convertSingleFileStandalone(index) {
     const file = selectedFiles[index];
     if (!file) return;
     const originalName = file.name; 
+    const myConversionId = standaloneConversionId;
 
     // 3. Start Conversion
     isConverting = true;
@@ -668,6 +669,7 @@ async function convertSingleFileStandalone(index) {
     try {
         // --- SWAP 1: JPG to WebP Function ---
         const webpBlob = await convertJpgtoWebpSimple(file);
+        if (myConversionId !== standaloneConversionId) return;
         
         // --- THE FIX: Re-sync index after 'await' ---
         const currentIndex = selectedFiles.findIndex(f => f.name === originalName);
@@ -688,6 +690,7 @@ async function convertSingleFileStandalone(index) {
         updateFileCardStatus(currentIndex, 'completed');   
         
     } catch (error) {
+        if (myConversionId !== standaloneConversionId) return;
         if (!isConverting && !isModalVisible) return;
         
         console.error('Conversion failed:', error);
@@ -698,7 +701,9 @@ async function convertSingleFileStandalone(index) {
             showError(`Failed to convert ${originalName}`);
         }
     } finally {
-        isConverting = false;
+        if (myConversionId === standaloneConversionId) {
+            isConverting = false;
+        }
         const hasSuccess = Object.values(conversionResults).some(r => r.status === 'success');
         
         // 2. Find the Download All button (make sure the ID matches your HTML)
@@ -928,9 +933,21 @@ function finalizeConversion() {
     }
 }
 
+let standaloneConversionId = 0;
 // ============ FILE MANAGEMENT ============
 function removeFile(index) {
     const targetIndex = parseInt(index);
+    const card = document.querySelector(`.preview-card[data-index="${targetIndex}"]`);
+if (card && card.classList.contains('processing')) {
+    isConverting = false; 
+    standaloneConversionId++;
+    if (Array.isArray(jpgWebpWorkers) && jpgWebpWorkers.length > 0) {
+        jpgWebpWorkers.forEach(w => w.terminate());
+        jpgWebpWorkers = [];
+        jpgWorkerIndex = 0;
+        initConverter(); 
+    }
+}
     
     // 1. Remove from data array
     selectedFiles.splice(targetIndex, 1);
