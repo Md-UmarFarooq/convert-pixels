@@ -8,6 +8,14 @@ const maxFileSize = 50 * 1024 * 1024; // 50MB
 let conversionResults = {};
 let isConverting = false;
 
+let totalPixelsInBatch = 0;
+let fileContributions = {};
+let animationFrame = null;
+let currentDisplayPixels = 0;
+let targetPixels = 0;
+let currentDisplayPercent = 0;
+let targetPercent = 0;
+
 // ============ WAIT FOR PAGE TO LOAD ============
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Page loaded, initializing...');
@@ -365,7 +373,26 @@ async function startBatchConversion() {
     }
 
     if (isConverting) return;
-
+    totalPixelsInBatch = 0;
+    fileContributions = {};
+    
+    for (const file of selectedFiles) {
+        await new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                file.pixelWeight = img.width * img.height;
+                totalPixelsInBatch += file.pixelWeight;
+                URL.revokeObjectURL(img.src);
+                resolve();
+            };
+            img.onerror = () => {
+                file.pixelWeight = 1000000;
+                totalPixelsInBatch += file.pixelWeight;
+                resolve();
+            };
+            img.src = URL.createObjectURL(file);
+        });
+    }
     isConverting = true;
     showProgressModal();
 
@@ -383,7 +410,7 @@ async function startBatchConversion() {
         // FIX: Don't convert again if already successful!
         if (conversionResults[i] && conversionResults[i].status === 'success') {
             console.log(`Skipping ${selectedFiles[i].name} - already converted.`);
-            updateProgress(); // Just update the bar
+            updateProgress(i, 100);
             continue; 
         }
 
@@ -412,7 +439,7 @@ async function convertSingleFile(index) {
     try {
         console.log(`Converting: ${file.name} (${formatSize(file.size)})`);
         
-        const jpgBlob = await convertPngToJpgSimple(file);
+        const jpgBlob = await convertPngToJpgSimple(file, index);
         
         const currentIndex = selectedFiles.findIndex(f => f.name === originalFileName);
         if (currentIndex === -1) return;
@@ -424,7 +451,7 @@ async function convertSingleFile(index) {
         };
         
         updateFileCardStatus(currentIndex, 'completed');
-        updateProgress();
+        updateProgress(index, 100);
         
     } catch (error) {
         console.error('Conversion failed:', error);
@@ -438,7 +465,7 @@ async function convertSingleFile(index) {
             updateFileCardStatus(currentIndex, 'failed');
         }
         
-        updateProgress();
+        updateProgress(index, 100);
     }
 }
 
@@ -463,10 +490,12 @@ async function initConverter() {
 
                     try {
                         const { buffer, mode } = e.data;
-                        
+                        self.postMessage({ type: 'progress', percent: 10 });
+
                         // 1. Reconstruct image from the transferred buffer
                         const blob = new Blob([buffer]);
                         bitmap = await createImageBitmap(blob);
+                        self.postMessage({ type: 'progress', percent: 30 });
                         
                         // 2. Setup OffscreenCanvas with performance flags
                         canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
@@ -482,6 +511,7 @@ async function initConverter() {
                         // 4. 1:1 Pixel Mapping (Fastest possible draw)
                         ctx.imageSmoothingEnabled = false; 
                         ctx.drawImage(bitmap, 0, 0);
+                        self.postMessage({ type: 'progress', percent: 50 });
                         
                         // 5. 🔥 IMMEDIATE MEMORY RELEASE: Close source bitmap
                         bitmap.close();
@@ -490,11 +520,15 @@ async function initConverter() {
                         // 6. Apply quality settings
                         const quality = mode === 'optimized' ? 0.75 : 0.92;
 
+                        self.postMessage({ type: 'progress', percent: 60 });
+
                         // 7. Encode to JPG
                         const jpgBlob = await canvas.convertToBlob({
                             type: "image/jpeg",
                             quality
                         });
+
+                        self.postMessage({ type: 'progress', percent: 80 });
 
                         // 8. 🔥 GPU CLEANUP: Reset canvas to flush VRAM
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -503,6 +537,7 @@ async function initConverter() {
 
                         // 9. 🔥 ZERO-COPY RETURN: Transfer buffer back to Main Thread
                         const finalBuffer = await jpgBlob.arrayBuffer();
+                        self.postMessage({ type: 'progress', percent: 100 });
                         self.postMessage({ buffer: finalBuffer }, [finalBuffer]);
 
                     } catch (err) {
@@ -592,7 +627,7 @@ cp_updateUI('best');
 // ==========================================
 // 3. THE FINAL CONVERSION CALL
 // ==========================================
-function convertPngToJpgSimple(pngBlob) {
+function convertPngToJpgSimple(pngBlob, fileIndex) {
     return new Promise(async (resolve, reject) => {
         if (pngJpgWorkers.length === 0)
             return reject("Engine loading...");
@@ -605,13 +640,13 @@ function convertPngToJpgSimple(pngBlob) {
             jpgWorkerIndex = (jpgWorkerIndex + 1) % pngJpgWorkers.length;
 
             worker.onmessage = (e) => {
-                // Clear handler to prevent memory leaks
-                worker.onmessage = null;
-                
-                if (e.data?.error) {
+                if (e.data.type === 'progress') {
+                    updateProgress(fileIndex, e.data.percent);
+                } else if (e.data?.error) {
+                    worker.onmessage = null;
                     reject(e.data.error);
                 } else {
-                    // 🔥 RECONSTRUCT BLOB from transferred buffer
+                    worker.onmessage = null;
                     const blob = new Blob([e.data.buffer], { type: 'image/jpeg' });
                     resolve(blob);
                 }
@@ -629,7 +664,76 @@ function convertPngToJpgSimple(pngBlob) {
     });
 }
 
+// ============ SMOOTH PIXEL COUNTER ============
+function animatePixelCounter() {
+    const progressText = document.getElementById('progressText');
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    
+    if (!progressText || !progressBar || !progressPercent) return;
+    
+    let needsUpdate = false;
+    
+    if (currentDisplayPixels < targetPixels) {
+        const gap = targetPixels - currentDisplayPixels;
+        const step = Math.max(1, Math.ceil(gap / 20));
+        currentDisplayPixels = Math.min(currentDisplayPixels + step, targetPixels);
+        needsUpdate = true;
+    }
+    
+    if (currentDisplayPercent < targetPercent) {
+        const gap = targetPercent - currentDisplayPercent;
+        const step = Math.max(0.1, gap / 20);
+        currentDisplayPercent = Math.min(currentDisplayPercent + step, targetPercent);
+        needsUpdate = true;
+    }
+    
+    if (needsUpdate) {
+        const formattedCurrent = Math.round(currentDisplayPixels).toLocaleString();
+        const formattedTotal = Math.round(totalPixelsInBatch).toLocaleString();
+        progressText.textContent = `${formattedCurrent} / ${formattedTotal} pixels processed`;
+        progressBar.style.width = `${currentDisplayPercent}%`;
+        progressBar.setAttribute('aria-valuenow', Math.round(currentDisplayPercent));
+        progressPercent.textContent = `${Math.round(currentDisplayPercent)}%`;
+    }
+    
+    if (currentDisplayPixels < targetPixels || currentDisplayPercent < targetPercent) {
+        animationFrame = requestAnimationFrame(animatePixelCounter);
+    } else {
+        animationFrame = null;
+    }
+}
 
+function updateProgress(fileIndex, internalFilePercent = 100) {
+    const total = selectedFiles.length;
+    const file = selectedFiles[fileIndex];
+
+    if (file && file.pixelWeight) {
+        const pixelsDoneForThisFile = (internalFilePercent / 100) * file.pixelWeight;
+        fileContributions[fileIndex] = pixelsDoneForThisFile;
+    }
+
+    const totalPixelsDone = Object.values(fileContributions).reduce((a, b) => a + b, 0);
+    targetPixels = totalPixelsDone;
+    
+    targetPercent = totalPixelsInBatch > 0
+        ? Math.min((totalPixelsDone / totalPixelsInBatch) * 100, 100)
+        : 0;
+    
+    if (!animationFrame) {
+        animatePixelCounter();
+    }
+
+    const completed = Object.values(conversionResults).filter(r => r.status === 'success').length;
+    const failed = Object.values(conversionResults).filter(r => r.status === 'failed').length;
+    
+    if (document.getElementById('completedCount')) 
+        document.getElementById('completedCount').textContent = completed;
+    if (document.getElementById('failedCount')) 
+        document.getElementById('failedCount').textContent = failed;
+    if (document.getElementById('remainingCount')) 
+        document.getElementById('remainingCount').textContent = total - (completed + failed);
+}
 
 // ============ CONVERT SINGLE FILE (STANDALONE) ============
 async function convertSingleFileStandalone(index) {
@@ -661,7 +765,7 @@ async function convertSingleFileStandalone(index) {
 
     try {
         // Core conversion logic
-        const pngBlob = await convertPngToJpgSimple(file);
+        const pngBlob = await convertPngToJpgSimple(file, index);
         if (myConversionId !== standaloneConversionId) return;
         
         // --- THE FIX: Find the FRESH index right now ---
@@ -787,12 +891,27 @@ function showProgressModal() {
     if (progressModal) {
         progressModal.style.display = 'flex';
         
-        // Reset progress
+        currentDisplayPixels = 0;
+        targetPixels = 0;
+        currentDisplayPercent = 0;
+        targetPercent = 0;
+        
+        if (animationFrame) {
+            cancelAnimationFrame(animationFrame);
+            animationFrame = null;
+        }
+        
         const progressBar = document.getElementById('progressBar');
-        if (progressBar) progressBar.style.width = '0%';
+        if (progressBar) {
+            progressBar.style.width = '0%';
+            progressBar.setAttribute('aria-valuenow', 0);
+        }
         
         const progressText = document.getElementById('progressText');
-        if (progressText) progressText.textContent = `Processing 0 of ${selectedFiles.length}`;
+        if (progressText) {
+            const formattedTotal = Math.round(totalPixelsInBatch).toLocaleString();
+            progressText.textContent = `0 / ${formattedTotal} pixels processed`;
+        }
         
         const progressPercent = document.getElementById('progressPercent');
         if (progressPercent) progressPercent.textContent = '0%';
@@ -822,47 +941,15 @@ function hideProgressModal() {
     }
 }
 
-function updateProgress() {
-    const total = selectedFiles.length;
-    const completed = Object.values(conversionResults).filter(r => r.status === 'success').length;
-    const failed = Object.values(conversionResults).filter(r => r.status === 'failed').length;
-    const processed = completed + failed;
-    const percent = Math.round((processed / total) * 100);
-    
-    // Update progress bar
-    const progressBar = document.getElementById('progressBar');
-    if (progressBar) {
-        progressBar.style.width = `${percent}%`;
-        progressBar.setAttribute('aria-valuenow', percent);
-    }
-    
-    // Update text
-    const progressText = document.getElementById('progressText');
-    if (progressText) {
-        progressText.textContent = `Processing ${processed} of ${total}`;
-    }
-    
-    const progressPercent = document.getElementById('progressPercent');
-    if (progressPercent) {
-        progressPercent.textContent = `${percent}%`;
-    }
-    
-    // Update counts
-    const completedCount = document.getElementById('completedCount');
-    if (completedCount) completedCount.textContent = completed;
-    
-    const failedCount = document.getElementById('failedCount');
-    if (failedCount) failedCount.textContent = failed;
-    
-    const remainingCount = document.getElementById('remainingCount');
-    if (remainingCount) remainingCount.textContent = total - processed;
-}
-
 var cancelAllBtn=document.querySelector(".btn-cancel");
 cancelAllBtn.addEventListener("click",cancelAllConversions);
 
 function cancelAllConversions() {
     // 1. Force the batch loop to stop immediately
+    if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+    }
     isConverting = false; 
     
     // ============ THE FIX: SAFE WORKER TERMINATION ============
@@ -928,7 +1015,6 @@ function finalizeConversion() {
         downloadAllBtn.style.display = hasSuccess ? 'block' : 'none';
     }
 }
-
 let standaloneConversionId = 0;
 // ============ FILE MANAGEMENT ============
 function removeFile(index) {
