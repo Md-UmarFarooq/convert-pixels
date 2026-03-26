@@ -112,6 +112,23 @@ function handleFileSelect(event, fileInput) {
     fileInput.value = ''; // Reset input
 }
 
+async function getFileWeight(file) {
+    if (file.pixelWeight) return file.pixelWeight;
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+            file.pixelWeight = img.width * img.height;
+            URL.revokeObjectURL(img.src);
+            resolve(file.pixelWeight);
+        };
+        img.onerror = () => {
+            file.pixelWeight = 1000000; // Fallback for corrupt files
+            resolve(1000000);
+        };
+        img.src = URL.createObjectURL(file);
+    });
+}
+
 // ============ HANDLE NEW FILES ============
 function handleNewFiles(newFiles, fileInput) {
     let addedCount = 0;
@@ -126,6 +143,7 @@ function handleNewFiles(newFiles, fileInput) {
             // Only add if there is a physical slot available
             if (selectedFiles.length < maxFiles) {
                 selectedFiles.push(file);
+                getFileWeight(file);
                 addedCount++;
             } else {
                 limitReachedCount++;
@@ -358,72 +376,49 @@ function updateFileCardStatus(index, status) {
 
 // ============ MAIN CONVERSION FUNCTIONS ============
 async function startBatchConversion() {
-    if (selectedFiles.length === 0) {
-        showError('Please select files first');
-        return;
-    }
+    if (selectedFiles.length === 0) { showError('Please select files first'); return; }
 
-    const allDone = selectedFiles.length > 0 && selectedFiles.every((_, i) => 
+    const allDone = selectedFiles.every((_, i) => 
         conversionResults[i] && conversionResults[i].status === 'success'
     );
-
-    if (allDone) {
-        showMessage('All files are already converted! ✨');
-        return; // Stop here, don't run the conversion again
-    }
-
+    if (allDone) { showMessage('All files are already converted! ✨'); return; }
     if (isConverting) return;
-    totalPixelsInBatch = 0;
-    fileContributions = {};
-    
-    for (const file of selectedFiles) {
-        await new Promise(resolve => {
-            const img = new Image();
-            img.onload = () => {
-                file.pixelWeight = img.width * img.height;
-                totalPixelsInBatch += file.pixelWeight;
-                URL.revokeObjectURL(img.src);
-                resolve();
-            };
-            img.onerror = () => {
-                file.pixelWeight = 1000000;
-                totalPixelsInBatch += file.pixelWeight;
-                resolve();
-            };
-            img.src = URL.createObjectURL(file);
-        });
-    }
-    isConverting = true;
-    showProgressModal();
 
-    // Update Main Button UI
+    // 🔥 FIX 1: Ensure all weights are ready so the denominator isn't zero
+    await Promise.all(selectedFiles.map(f => getFileWeight(f)));
+    
+    totalPixelsInBatch = selectedFiles.reduce((acc, f) => acc + (f.pixelWeight || 0), 0);
+    fileContributions = {};
+    isConverting = true;
+    showProgressModal(); 
+
+    // 🔥 FIX 2: If files were already converted (standalone), add them to bar NOW
+    selectedFiles.forEach((f, i) => {
+        if (conversionResults[i] && conversionResults[i].status === 'success') {
+            fileContributions[i] = f.pixelWeight;
+        }
+    });
+
+    // Update targets immediately so the bar doesn't "jump" later
+    targetPixels = Object.values(fileContributions).reduce((a, b) => a + b, 0);
+    targetPercent = totalPixelsInBatch > 0 ? (targetPixels / totalPixelsInBatch) * 100 : 0;
+    currentDisplayPercent = targetPercent; 
+
     const convertBtn = document.getElementById('convertBtn');
     if (convertBtn) {
         convertBtn.disabled = true;
         convertBtn.textContent = 'Processing...';
     }
 
+    // Run the conversion loop
     for (let i = 0; i < selectedFiles.length; i++) {
-        // BREAK if user pressed cancel
         if (!isConverting) break; 
-
-        // FIX: Don't convert again if already successful!
         if (conversionResults[i] && conversionResults[i].status === 'success') {
-            console.log(`Skipping ${selectedFiles[i].name} - already converted.`);
             updateProgress(i, 100);
             continue; 
         }
-
         await convertSingleFile(i);
-        await new Promise(r => setTimeout(r, 50)); // This prevents the UI from freezing
-    }
-    var downloadAllBtn=document.querySelector(".btn-download");
-    if(downloadAllBtn){
-        downloadAllBtn.style.display="block";
-        downloadAllBtn.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'end' 
-    });
+        await new Promise(r => setTimeout(r, 50)); 
     }
     finalizeConversion();
 }
@@ -680,7 +675,7 @@ function animatePixelCounter() {
         needsUpdate = true;
     }
     
-    if (currentDisplayPercent < targetPercent) {
+    if (totalPixelsInBatch > 0 && currentDisplayPercent < targetPercent) {
         const gap = targetPercent - currentDisplayPercent;
         const step = Math.max(0.1, gap / 20);
         currentDisplayPercent = Math.min(currentDisplayPercent + step, targetPercent);
@@ -689,14 +684,23 @@ function animatePixelCounter() {
     
     if (needsUpdate) {
         const formattedCurrent = Math.round(currentDisplayPixels).toLocaleString();
-        const formattedTotal = Math.round(totalPixelsInBatch).toLocaleString();
-        progressText.textContent = `${formattedCurrent} / ${formattedTotal} pixels processed`;
-        progressBar.style.width = `${currentDisplayPercent}%`;
+        
+        if (totalPixelsInBatch > 0) {
+            const formattedTotal = Math.round(totalPixelsInBatch).toLocaleString();
+            progressText.textContent = `${formattedCurrent} / ${formattedTotal} pixels processed`;
+            progressBar.style.width = `${currentDisplayPercent}%`;
+            progressPercent.textContent = `${Math.round(currentDisplayPercent)}%`;
+        } else {
+            progressText.textContent = `${formattedCurrent} / ... pixels processed`;
+            progressBar.style.width = `0%`;
+            progressPercent.textContent = `0%`;
+        }
+        
         progressBar.setAttribute('aria-valuenow', Math.round(currentDisplayPercent));
-        progressPercent.textContent = `${Math.round(currentDisplayPercent)}%`;
     }
     
-    if (currentDisplayPixels < targetPixels || currentDisplayPercent < targetPercent) {
+    const barNeedsToMove = totalPixelsInBatch > 0 && currentDisplayPercent < targetPercent;
+    if (currentDisplayPixels < targetPixels || barNeedsToMove) {
         animationFrame = requestAnimationFrame(animatePixelCounter);
     } else {
         animationFrame = null;
@@ -907,8 +911,8 @@ function showProgressModal() {
         
         const progressText = document.getElementById('progressText');
         if (progressText) {
-            const formattedTotal = Math.round(totalPixelsInBatch).toLocaleString();
-            progressText.textContent = `0 / ${formattedTotal} pixels processed`;
+            // ✅ FIX: Initial state matches the Phase 1 logic
+            progressText.textContent = `0 / ... pixels processed`;
         }
         
         const progressPercent = document.getElementById('progressPercent');
@@ -923,7 +927,6 @@ function showProgressModal() {
         const remainingCount = document.getElementById('remainingCount');
         if (remainingCount) remainingCount.textContent = selectedFiles.length.toString();
         
-        // Show cancel button, hide download button
         const cancelBtn = document.getElementById('cancelBtn');
         if (cancelBtn) cancelBtn.style.display = 'block';
         
@@ -1018,56 +1021,57 @@ let standaloneConversionId = 0;
 function removeFile(index) {
     const targetIndex = parseInt(index);
     const card = document.querySelector(`.preview-card[data-index="${targetIndex}"]`);
-if (card && card.classList.contains('processing')) {
-    isConverting = false; 
-    standaloneConversionId++;
-    if (Array.isArray(webpJpgWorkers) && webpJpgWorkers.length > 0) {
-        webpJpgWorkers.forEach(w => w.terminate());
-        webpJpgWorkers = [];
-        jpgWorkerIndex = 0;
-        initConverter(); 
+    
+    if (card && card.classList.contains('processing')) {
+        isConverting = false; 
+        standaloneConversionId++;
+        if (Array.isArray(webpJpgWorkers) && webpJpgWorkers.length > 0) {
+            webpJpgWorkers.forEach(w => w.terminate());
+            webpJpgWorkers = [];
+            jpgWorkerIndex = 0;
+            initConverter(); 
+        }
     }
-}
-    // 1. Remove from data array
+    
     selectedFiles.splice(targetIndex, 1);
     
-    // 2. RE-INDEX the results object (Keep your original logic here)
     const newResults = {};
     for (let i = 0; i < selectedFiles.length; i++) {
         let oldIndex = (i >= targetIndex) ? i + 1 : i;
-        if (conversionResults[oldIndex]) {
-            newResults[i] = conversionResults[oldIndex];
-        }
+        if (conversionResults[oldIndex]) newResults[i] = conversionResults[oldIndex];
     }
     conversionResults = newResults;
 
-    // 3. UI SYNC: Remove the specific card and update IDs of the rest
+    // 🔥 FIX 3: REBUILD PIXEL MATH FROM ZERO (No ghost pixels)
+    totalPixelsInBatch = 0;
+    fileContributions = {};
+
+    selectedFiles.forEach((file, i) => {
+        const weight = file.pixelWeight || 0;
+        totalPixelsInBatch += weight;
+        if (conversionResults[i] && conversionResults[i].status === 'success') {
+            fileContributions[i] = weight;
+        }
+    });
+
+    targetPixels = Object.values(fileContributions).reduce((a, b) => a + b, 0);
+    targetPercent = totalPixelsInBatch > 0 ? (targetPixels / totalPixelsInBatch) * 100 : 0;
+
     const previewGrid = document.getElementById('previewGrid');
-    const cardToRemove = previewGrid.querySelector(`.preview-card[data-index="${targetIndex}"]`);
-    
-    if (cardToRemove) {
-        cardToRemove.remove(); // Visual removal
-        
-        // Update all following cards so their buttons work with the new array order
+    if (card) {
+        card.remove(); 
         const remainingCards = previewGrid.querySelectorAll('.preview-card');
-        remainingCards.forEach((card, i) => {
-            card.dataset.index = i; // This updates what the buttons see when clicked
-        });
+        remainingCards.forEach((c, i) => { c.dataset.index = i; });
     }
 
-    // 4. Update Global UI Elements
     updateFileCount();      
     updateDropzoneText();   
     
     if (selectedFiles.length === 0) {
         hidePreviewSection();
-        updateFilePreviews(); // Show empty state
+        updateFilePreviews();
     }
-    
-    const convertBtn = document.getElementById('convertBtn');
-    if (convertBtn) {
-        convertBtn.textContent = `Convert All`;
-    }
+    if (document.getElementById('convertBtn')) document.getElementById('convertBtn').textContent = `Convert All`;
 }
 
 function clearAllFiles() {
