@@ -29,6 +29,7 @@
     <link rel="stylesheet" href="/webp-to-png/styles.css">
     <link rel="prefetch" href="/webp-to-png/upng.js">
     <link rel="prefetch" href="/webp-to-png/pako.js">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
 
     <link rel="shortcut icon" href="/favicons/favicon.ico" type="image/x-icon">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png">
@@ -311,9 +312,16 @@
             </div>
             <div class="modal-buttons">
                 <button id="cancelConversionBtn" class="btn-cancel">Cancel</button>
-                <button id="downloadAllBtn" class="btn-download">Download All</button>
             </div>
         </div>
+    </div>
+
+    <div id="zipLoader" style="display:none;">
+    <div class="loader-card">
+        <div class="orange-spinner"></div>
+        <p>Bundling your files...</p>
+        <small>This will only take a moment.</small>
+    </div>
     </div>
 
     <!-- Alert Container -->
