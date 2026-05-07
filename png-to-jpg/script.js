@@ -45,7 +45,7 @@ function setupEventListeners(fileInput) {
     const clearAllBtn = document.getElementById('clearAllBtn');
     const convertBtn = document.getElementById('convertBtn');
     const cancelBtn = document.getElementById('cancelBtn');
-    const downloadAllBtn = document.getElementById('downloadAllBtn');
+    const downloadAllBtn = document.getElementById('downloadBtn');
     
     // Check if elements exist
     if (!dropzone || !clearAllBtn || !convertBtn) {
@@ -708,10 +708,13 @@ function animatePixelCounter() {
     }
 }
 
+let downloadBtnVisible = false; // Initialize globally
+
 function updateProgress(fileIndex, internalFilePercent = 100) {
     const total = selectedFiles.length;
     const file = selectedFiles[fileIndex];
 
+    // Calculate pixel-based progress
     if (file && file.pixelWeight) {
         const pixelsDoneForThisFile = (internalFilePercent / 100) * file.pixelWeight;
         fileContributions[fileIndex] = pixelsDoneForThisFile;
@@ -728,6 +731,7 @@ function updateProgress(fileIndex, internalFilePercent = 100) {
         animatePixelCounter();
     }
 
+    // Update the conversion stats UI
     const completed = Object.values(conversionResults).filter(r => r.status === 'success').length;
     const failed = Object.values(conversionResults).filter(r => r.status === 'failed').length;
     
@@ -737,6 +741,18 @@ function updateProgress(fileIndex, internalFilePercent = 100) {
         document.getElementById('failedCount').textContent = failed;
     if (document.getElementById('remainingCount')) 
         document.getElementById('remainingCount').textContent = total - (completed + failed);
+
+    // 🔥 OPTIMIZED CHECK: Shows button once and stops checking
+    if (!downloadBtnVisible) {
+        const hasSuccess = Object.values(conversionResults).some(r => r.status === 'success');
+        if (hasSuccess) {
+            const downloadAllBtn = document.getElementById('downloadBtn'); // Ensure ID is correct
+            if (downloadAllBtn) {
+                downloadAllBtn.style.display = 'block';
+                downloadBtnVisible = true; 
+            }
+        }
+    }
 }
 
 // ============ CONVERT SINGLE FILE (STANDALONE) ============
@@ -868,25 +884,71 @@ function downloadConvertedFile(index) {
     }, 1500);
 }
 
-var downloadAllBtn=document.querySelector(".btn-download");
-downloadAllBtn.addEventListener("click",downloadAllConverted);
 
-function downloadAllConverted() {
-    let downloaded = 0;
-    
-    selectedFiles.forEach((file, index) => {
-        const result = conversionResults[index];
-        if (result && result.status === 'success') {
-            setTimeout(() => {
-                downloadConvertedFile(index);
-            }, downloaded * 300);
-            downloaded++;
-        }
-    });
-    
-    if (downloaded > 0) {
-        showMessage(`Downloading ${downloaded} file${downloaded > 1 ? 's' : ''}...`);
+async function downloadAllConverted() {
+    const successEntries = Object.entries(conversionResults).filter(
+        ([_, res]) => res && res.status === 'success' && res.blob
+    );
+
+    if (successEntries.length === 0) {
+        if (typeof showError === 'function') showError('No converted files to download.');
+        return;
     }
+
+    const loader = document.getElementById('zipLoader');
+    
+    // 1. Show the Orange Loader
+    if (loader) loader.style.display = 'flex';
+
+    // 2. Small delay to allow UI to render loader before JSZip blocks thread
+    setTimeout(async () => {
+        try {
+            const zip = new JSZip();
+            
+            // Add successful blobs to zip
+            successEntries.forEach(([_, result]) => {
+                zip.file(result.fileName, result.blob);
+            });
+
+            // Generate ZIP (STORE is fastest for images)
+            const zipContent = await zip.generateAsync({ 
+                type: "blob",
+                compression: "STORE" 
+            });
+
+            // 3. FILENAME STYLE: Convertpixels_May 7(14-25-30).zip
+            const now = new Date();
+            const day = now.getDate();
+            const month = now.toLocaleString('en-US', { month: 'short' });
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+            
+            const zipName = `Convertpixels_${month} ${day}(${hours}-${minutes}-${seconds}).zip`;
+
+            // 4. Trigger the Download
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(zipContent);
+            link.download = zipName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 5. Memory Management (Wait for download to start)
+            setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+
+            if (typeof showMessage === 'function') {
+                showMessage(`Download started: ${successEntries.length} files`);
+            }
+
+        } catch (err) {
+            console.error("ZIP Error:", err);
+            if (typeof showError === 'function') showError("Failed to bundle files.");
+        } finally {
+            // 6. Hide the Loader
+            if (loader) loader.style.display = 'none';
+        }
+    }, 50); 
 }
 
 // ============ PROGRESS MANAGEMENT ============
@@ -932,8 +994,6 @@ function showProgressModal() {
         const cancelBtn = document.getElementById('cancelBtn');
         if (cancelBtn) cancelBtn.style.display = 'block';
         
-        const downloadAllBtn = document.getElementById('downloadAllBtn');
-        if (downloadAllBtn) downloadAllBtn.style.display = 'none';
     }
 }
 
@@ -1013,10 +1073,6 @@ function finalizeConversion() {
 
     // Show "Download All" only if there is at least one success
     const hasSuccess = Object.values(conversionResults).some(r => r.status === 'success');
-    const downloadAllBtn = document.getElementById('downloadAllBtn'); // Main UI one
-    if (downloadAllBtn) {
-        downloadAllBtn.style.display = hasSuccess ? 'block' : 'none';
-    }
 }
 let standaloneConversionId = 0;
 // ============ FILE MANAGEMENT ============
