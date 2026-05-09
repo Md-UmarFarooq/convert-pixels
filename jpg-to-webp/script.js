@@ -8,6 +8,9 @@ const maxFileSize = 50 * 1024 * 1024; // 50MB
 let conversionResults = {};
 let isConverting = false;
 
+// Track active thumbnail generation tasks
+let pendingThumbnails = 0;
+
 let totalPixelsInBatch = 0;
 let fileContributions = {};
 let animationFrame = null;
@@ -300,9 +303,9 @@ function createFileCard(file, index) {
 }
 
 async function generatePreviewThumbnail(file, imgElement, loaderElement) {
+    pendingThumbnails++; // ⬆️ Task started
     try {
-        // If the image is MASSIVE, we tell the browser to only decode 
-        // a small portion of it into memory. This is the ultimate lag-fix.
+        // High-performance decoding to limit memory footprint
         const bitmap = await createImageBitmap(file, { 
             resizeWidth: 300, 
             resizeQuality: 'low' 
@@ -314,15 +317,34 @@ async function generatePreviewThumbnail(file, imgElement, loaderElement) {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(bitmap, 0, 0);
 
-        imgElement.src = canvas.toDataURL('image/jpeg', 0.6); // Lower quality for preview
+        imgElement.src = canvas.toDataURL('image/jpeg', 0.6); // Lower quality for preview speed
         imgElement.style.display = 'block';
         if (loaderElement) loaderElement.style.display = 'none';
 
         bitmap.close();
     } catch (err) {
-        // Fallback for images that are TOO big for the browser's canvas limit
-        loaderElement.textContent = "Preview unavailable (Image too large)";
+        // Fallback for massive or corrupt images
+        if (loaderElement) loaderElement.textContent = "Preview unavailable";
+    } finally {
+        pendingThumbnails--; // ⬇️ Task finished (always executes)
     }
+}
+
+function waitForThumbnails() {
+    return new Promise((resolve) => {
+        // If there are no pending thumbnails, let CPU settle for a split-second and resolve
+        if (pendingThumbnails === 0) {
+            return setTimeout(resolve, 200); 
+        }
+        
+        const checkInterval = setInterval(() => {
+            if (pendingThumbnails === 0) {
+                clearInterval(checkInterval);
+                // The "Breathe" period: wait 300ms for garbage collection to settle
+                setTimeout(resolve, 300);
+            }
+        }, 100); 
+    });
 }
 
 // ============ UPDATE FILE CARD STATUS ============
@@ -376,6 +398,13 @@ function updateFileCardStatus(index, status) {
 
 // ============ MAIN CONVERSION FUNCTIONS ============
 async function startBatchConversion() {
+    // 🛡️ THE THUMBNAIL GUARD
+    const guard = document.getElementById('thumbGuard');
+    if (pendingThumbnails > 0) {
+        if (guard) guard.style.display = 'flex';
+        await waitForThumbnails(); 
+        if (guard) guard.style.display = 'none';
+    }
     if (selectedFiles.length === 0) { showError('Please select files first'); return; }
 
     const allDone = selectedFiles.every((_, i) => 
@@ -762,6 +791,13 @@ function updateProgress(fileIndex, internalFilePercent = 100) {
 
 // ============ CONVERT SINGLE FILE (STANDALONE) ============
 async function convertSingleFileStandalone(index) {
+    // 🛡️ THE THUMBNAIL GUARD
+    const guard = document.getElementById('thumbGuard');
+    if (pendingThumbnails > 0) {
+        if (guard) guard.style.display = 'flex';
+        await waitForThumbnails(); 
+        if (guard) guard.style.display = 'none';
+    }
     // 1. Force reset if a previous batch was cancelled/hidden
     const modal = document.getElementById('progressModal');
     const isModalVisible = modal && modal.style.display === 'flex';
