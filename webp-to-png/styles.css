@@ -818,6 +818,15 @@ input, select {
     cursor: not-allowed;
 }
 
+.preview-card.waiting {
+    border-color: #64748b;
+    box-shadow: 0 0 0 1px rgba(100, 116, 139, 0.15);
+}
+
+.preview-card.waiting .convert-single-btn {
+    background: #64748b;
+}
+
 .preview-card.completed .convert-single-btn {
     background: #10b981;
 }
