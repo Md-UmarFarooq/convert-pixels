@@ -2,7 +2,7 @@
 // ============ GLOBAL VARIABLES ============
 let selectedFiles = [];
 const maxFiles = 20;
-const maxFileSize = 50 * 1024 * 1024; // 50MB
+const maxFileSize = 300 * 1024 * 1024; // 300MB
 
 // Store conversion results
 let conversionResults = {};
@@ -182,7 +182,7 @@ function handleNewFiles(newFiles, fileInput) {
 function validateFile(file) {
     // 1. Size Check
     if (file.size > maxFileSize) {
-        showError(`${file.name} is too large (max 50MB)`);
+        showError(`${file.name} is too large (max 300MB)`);
         return { isValid: false, reason: 'size' };
     }
     
