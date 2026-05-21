@@ -7,7 +7,6 @@
     <meta name="description" content="Fast, free PNG to JPG batch converter. Convert up to 20 images at once with adjustable quality. Reduce file size instantly while keeping high resolution. 100% private local processing.">
     <link rel="canonical" href="https://convertpixels.org/png-to-jpg">
 
-    <!-- Open Graph (Facebook, LinkedIn, Discord, etc.) -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://convertpixels.org/png-to-jpg">
     <meta property="og:title" content="Free PNG to JPG Converter | Batch Convert 20 Images Instantly">
@@ -18,7 +17,6 @@
     <meta property="og:image:alt" content="ConvertPixels - Free batch PNG to JPG converter with visual preview">
     <meta property="og:site_name" content="ConvertPixels">
 
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Free PNG to JPG Converter | Batch Convert 20 Images Instantly">
     <meta name="twitter:description" content="No watermarks, no quality loss. 100% private local processing. Free & instant.">
@@ -47,282 +45,334 @@
     <meta name="theme-color" content="#4fd1c5">
 
     <script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "SoftwareApplication",
-          "name": "Free PNG to JPG Batch Converter",
-          "operatingSystem": "All",
-          "applicationCategory": "MultimediaApplication",
-          "description": "Convert PNG to JPG for web compatibility. Batch convert 20 images with quality settings. Remove background, reduce file size, 100% private processing.",
-          "url": "https://convertpixels.org/png-to-jpg",
-          "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "USD"
-          },
-          "featureList": [
-            "Batch conversion (20 files)",
-            "Quality settings control",
-            "Background removal",
-            "File size reduction",
-            "Private browser processing",
-            "No watermarks",
-            "Free"
-          ],
-          "screenshot": "https://convertpixels.org/png-to-jpg/og-png-to-jpg.jpg"
-        }
-        </script>
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Free PNG to JPG Batch Converter",
+      "operatingSystem": "All",
+      "applicationCategory": "MultimediaApplication",
+      "description": "Convert PNG to JPG for web compatibility. Batch convert 20 images with quality settings. Remove background, reduce file size, 100% private processing.",
+      "url": "https://convertpixels.org/png-to-jpg",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "PNG to JPG conversion",
+        "Batch conversion (20 files)",
+        "Supports ultra-high resolution images (100MP+)",
+        "Multi-threaded local processing",
+        "Quality settings control",
+        "Background removal",
+        "File size reduction",
+        "Private browser processing",
+        "No watermarks",
+        "Free"
+      ],
+      "screenshot": "https://convertpixels.org/png-to-jpg/og-png-to-jpg.jpg"
+    }
+    </script>
 </head>
 <body>
 
-  <nav style="height: 70px;">
+<nav style="height: 70px;">
     <a href="https://convertpixels.org" class="logo" aria-label="ConvertPixels Home">CONVERTPIXELS</a>
     <div class="batch-status" style="min-width: 150px;">Batch Mode: 20/20 active</div>
 </nav>
 
-    <main>
-        <h1>PNG to JPG Batch Converter</h1>
-<p class="subtitle">Convert up to 20 images at once with <strong>Pro Quality Settings</strong>. 100% Free • No Watermarks • Private & Secure</p>
-        <button class="settings-collapse-btn" id="collapseBtn" title="Toggle settings" aria-label="Open conversion settings">
-          <span aria-hidden="true">⚙️</span>
-        </button>
+<main>
+    <h1>PNG to JPG Batch Converter</h1>
+    <p class="subtitle">Convert up to 20 images at once with <strong>Pro Quality Settings</strong>. 100% Free • No Watermarks • Private & Secure</p>
+    <button class="settings-collapse-btn" id="collapseBtn" title="Toggle settings" aria-label="Open conversion settings">
+        <span aria-hidden="true">⚙️</span>
+    </button>
 
-        <!-- Quality Toggle Section -->
-        <div class="quality-toggle-container collapsed" id="qualityToggleContainer">
-          <h2 class="quality-toggle-title">📊 JPG Compression Settings</h2>
-          <p class="quality-toggle-description">
-              Choose between High Quality JPG or Optimized Size. High Quality preserves visual detail with minimal compression, while Optimized applies stronger JPEG compression to significantly reduce file size with very small quality loss.
-          </p>
-          
-          <div class="quality-toggle" id="qualityToggle">
-              <div class="quality-slider" id="qualitySlider"></div>
-              <div class="quality-option active" id="optionBest" data-quality="0.92" role="button" tabindex="0" aria-label="Set to High Quality">
+    <div class="quality-toggle-container collapsed" id="qualityToggleContainer">
+        <h2 class="quality-toggle-title">📊 JPG Compression Settings</h2>
+        <p class="quality-toggle-description">
+            Choose between High Quality JPG or Optimized Size. High Quality preserves visual detail with minimal compression, while Optimized applies stronger JPEG compression to significantly reduce file size with very small quality loss.
+        </p>
+        
+        <div class="quality-toggle" id="qualityToggle">
+            <div class="quality-slider" id="qualitySlider"></div>
+            <div class="quality-option active" id="optionBest" data-quality="0.92" role="button" tabindex="0" aria-label="Set to High Quality">
                 <span>✨ High Quality</span>
-              </div>
-              <div class="quality-option inactive" id="optionOptimized" data-quality="0.75" role="button" tabindex="0" aria-label="Set to Optimized Size">
+            </div>
+            <div class="quality-option inactive" id="optionOptimized" data-quality="0.75" role="button" tabindex="0" aria-label="Set to Optimized Size">
                 <span>⚡ Optimized Size</span>
-             </div>
-          </div>
-          
-          <div class="quality-details" id="qualityDetails">
-              <div class="quality-detail-item">
-                  <span class="quality-label">Current Setting:</span>
-                  <span class="quality-value best" id="currentSetting">High Quality</span>
-              </div>
-              <div class="quality-detail-item">
-                  <span class="quality-label">File Size:</span>
-                  <span class="quality-value" id="fileSizeEstimate">~80-90% smaller than PNG</span>
-              </div>
-              <div class="quality-detail-item">
-                  <span class="quality-label">Compression:</span>
-                  <span class="quality-value" id="compressionLevel">Minimal JPEG compression</span>
-              </div>
-              <div class="quality-detail-item">
-                  <span class="quality-label">Best For:</span>
-                  <span class="quality-value" id="bestForUse">Print, photography, professional use</span>
-              </div>
-          </div>
-          
-          <p class="quality-tip">
-              💡 Tip: Choose "Optimized Size" for websites and social media. "High Quality" is best for printing or archival.
-          </p>
-      </div>
-        <!-- Upload Area -->
-        <div class="dropzone" id="dropzone">
-            <div class="badge-10k">10K READY</div>
-            <p class="dropzone-text" aria-live="polite">Click or drag image to convert</p>
-            <span class="dropzone-hint">You can upload up to 20 images at a time</span>
-        </div>
-
-        <div class="preview-section" id="previewSection">
-            <div class="preview-header">
-                <h3>Selected Files <span id="fileCount" class="file-count" aria-live="polite">(0)</span></h3>
-                <button id="clearAllBtn" class="clear-btn" aria-label="Clear all selected files">Clear All</button>
-            </div>
-            <div class="preview-grid" id="previewGrid" aria-live="polite"></div>
-        </div>
-
-        <div class="controls">
-            <button class="btn-convert" id="convertBtn">Convert All</button>
-            <button class="btn-download" id="downloadBtn">Download All</button>
-        </div>
-    </main>
-
-    <!-- AFTER DOWNLOAD BUTTON, BEFORE FOOTER -->
-    <div class="seo-content-section">
-  
-      <h2 class="seo-main-heading">
-          <span class="emoji">⚡</span> Fast PNG to JPG Batch Converter <span class="emoji">⚡</span>
-      </h2>
-      
-      <div class="seo-card seo-what-is">
-          <h2 class="seo-subheading">
-              <span class="arrow">▸</span> Convert PNG to JPG with Dramatic Size Reduction
-          </h2>
-          <p class="seo-paragraph">
-              ConvertPixels provides the fastest way to <strong>convert PNG to JPG</strong> while reducing file size by up to 95%. Process up to <strong>20 images at once</strong> with our batch converter—perfect for optimizing website images, email attachments, and saving storage space instantly.
-          </p>
-      </div>
-      
-      <div class="seo-features">
-          <h3 class="seo-subheading center">
-              <span class="icon">🔧</span> Optimized for File Size Reduction
-          </h3>
-          
-          <div class="features-grid">
-              <div class="feature-card">
-                  <h4 class="feature-title">🚀 20-File Batch Limit</h4>
-                  <p class="feature-desc">
-                      Stop converting one by one. Upload up to <strong>20 PNG files</strong> simultaneously and watch them convert to compact JPGs in a single click.
-                  </p>
-              </div>
-              
-              <div class="feature-card feature-card-blue">
-                  <h4 class="feature-title">🛡️ Secure Local Conversion</h4>
-                  <p class="feature-desc">
-                      Your images stay on your device. We use <strong>browser-based technology</strong> to process your PNGs locally, so your data is never sent to a server.
-                  </p>
-              </div>
-              
-              <div class="feature-card feature-card-green">
-                  <h4 class="feature-title">💯 No Watermarks</h4>
-                  <p class="feature-desc">
-                      Get clean, professional JPG files every time. We never add watermarks or hidden fees to your converted images.
-                  </p>
-              </div>
-          </div>
-      </div>
-  
-      <div class="seo-card seo-pro-settings" style="background: rgba(59, 130, 246, 0.05); border: 1px dashed var(--primary);">
-          <h3 class="seo-subheading">
-              <span class="icon">⚙️</span> Adjustable JPG Quality Settings
-          </h3>
-          <p class="seo-paragraph">
-              Control your file size with our <strong>Quality Slider</strong>. Choose <strong>Maximum Quality</strong> for near-lossless results ideal for printing, or <strong>Optimized Size</strong> for ultra-compact files perfect for web use. Reduce PNG file sizes dramatically while maintaining excellent visual quality.
-          </p>
-      </div>
-      
-      <div class="seo-card seo-how-to">
-          <h3 class="seo-subheading">
-              <span class="icon">📱</span> How to Batch Convert PNG to JPG
-          </h3>
-          
-          <div class="steps-container">
-              <div class="step">
-                  <div class="step-number">1</div>
-                  <div class="step-content">
-                      <h4 class="step-title">Select 20 PNGs</h4>
-                      <p class="step-desc">Drag and drop your PNG files into the upload zone. You can select up to 20 images for <strong>batch conversion</strong>.</p>
-                  </div>
-              </div>
-              
-              <div class="step">
-                  <div class="step-number step-number-blue">2</div>
-                  <div class="step-content">
-                      <h4 class="step-title">Choose Quality Setting</h4>
-                      <p class="step-desc">Pick "Maximum Quality" for best visuals or "Optimized Size" for smallest files. Both options create JPGs much smaller than PNG.</p>
-                  </div>
-              </div>
-              
-              <div class="step">
-                  <div class="step-number step-number-green">3</div>
-                  <div class="step-content">
-                      <h4 class="step-title">Instant Download</h4>
-                      <p class="step-desc">Once converted, your compact JPGs are ready. Download them all instantly—now up to 95% smaller than the original PNGs.</p>
-                  </div>
-              </div>
-          </div>
-      </div>
-  
-      <div class="seo-faq">
-          <h3 class="seo-subheading center">
-              <span class="icon">❓</span> FAQ: PNG to JPG Conversion
-          </h3>
-          
-          <div class="faq-container">
-              <div class="faq-item">
-                  <h4 class="faq-question">Will JPG files be smaller than PNG?</h4>
-                  <p class="faq-answer">Yes! JPG compression typically reduces PNG file sizes by <strong>80-95%</strong>. A 1MB PNG becomes just 50-200KB as JPG while maintaining great quality.</p>
-              </div>
-              
-              <div class="faq-item">
-                  <h4 class="faq-question">Is there any quality loss in PNG to JPG conversion?</h4>
-                  <p class="faq-answer">JPG uses efficient compression that discards some data imperceptible to the human eye. At <strong>Maximum Quality</strong> setting, the visual difference is negligible while file size drops dramatically.</p>
-              </div>
-  
-              <div class="faq-item">
-                  <h4 class="faq-question">Why can't I upload more than 20 files?</h4>
-                  <p class="faq-answer">To ensure <strong>maximum speed</strong> and prevent browser crashes on mobile, we've optimized the batch limit to 20 files per session.</p>
-              </div>
-          </div>
-      </div>
-  </div>
-
-    <footer class="footer-matrix">
-        <div class="matrix-grid">
-            <div class="matrix-column">
-                <h4>JPG Conversions</h4>
-                <a href="https://convertpixels.org/jpg-to-png">JPG to PNG</a>
-                <a href="https://convertpixels.org/jpg-to-webp">JPG to WEBP</a>
-            </div>
-            <div class="matrix-column">
-                <h4>PNG Conversions</h4>
-                <a href="https://convertpixels.org/png-to-jpg" class="active">PNG to JPG</a>
-                <a href="https://convertpixels.org/png-to-webp">PNG to WEBP</a>
-            </div>
-            <div class="matrix-column">
-                <h4>WEBP Conversions</h4>
-                <a href="https://convertpixels.org/webp-to-png">WEBP to PNG</a>
-                <a href="https://convertpixels.org/webp-to-jpg">WEBP to JPG</a>
-            </div>
-            <div class="matrix-column utility-col">
-                <h4>Privacy & Terms</h4>
-                <a href="https://convertpixels.org/privacy-policy">Privacy Policy</a>
-                <a href="https://convertpixels.org/terms-of-service">Terms of Service</a>
             </div>
         </div>
-    </footer>
+        
+        <div class="quality-details" id="qualityDetails">
+            <div class="quality-detail-item">
+                <span class="quality-label">Current Setting:</span>
+                <span class="quality-value best" id="currentSetting">High Quality</span>
+            </div>
+            <div class="quality-detail-item">
+                <span class="quality-label">File Size:</span>
+                <span class="quality-value" id="fileSizeEstimate">~80-90% smaller than PNG</span>
+            </div>
+            <div class="quality-detail-item">
+                <span class="quality-label">Compression:</span>
+                <span class="quality-value" id="compressionLevel">Minimal JPEG compression</span>
+            </div>
+            <div class="quality-detail-item">
+                <span class="quality-label">Best For:</span>
+                <span class="quality-value" id="bestForUse">Print, photography, professional use</span>
+            </div>
+        </div>
+        
+        <p class="quality-tip">
+            💡 Tip: Choose "Optimized Size" for websites and social media. "High Quality" is best for printing or archival.
+        </p>
+    </div>
 
-    <!-- Progress Modal -->
-    <div class="progress-modal" id="progressModal" role="dialog" aria-labelledby="modalTitle" aria-hidden="true">
-        <div class="modal-content">
-            <h3 id="modalTitle">Converting Files</h3>
-            <div class="progress-stats">
-                <span id="progressText" aria-live="polite">Processing 0 of 0</span>
-                <span id="progressPercent" aria-live="polite">0%</span>
+    <div class="dropzone" id="dropzone">
+        <div class="badge-10k">10K READY</div>
+        <p class="dropzone-text" aria-live="polite">Click or drag image to convert</p>
+        <span class="dropzone-hint">You can upload up to 20 images at a time</span>
+    </div>
+
+    <div class="preview-section" id="previewSection">
+        <div class="preview-header">
+            <h3>Selected Files <span id="fileCount" class="file-count" aria-live="polite">(0)</span></h3>
+            <button id="clearAllBtn" class="clear-btn" aria-label="Clear all selected files">Clear All</button>
+        </div>
+        <div class="preview-grid" id="previewGrid" aria-live="polite"></div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-convert" id="convertBtn">Convert All</button>
+        <button class="btn-download" id="downloadBtn">Download All</button>
+    </div>
+</main>
+
+<div class="seo-content-section">
+
+    <h2 class="seo-main-heading">
+        <span class="emoji">⚡</span> Fast PNG to JPG Batch Converter <span class="emoji">⚡</span>
+    </h2>
+    
+    <div class="seo-card seo-what-is">
+        <h2 class="seo-subheading">
+            <span class="arrow">▸</span> Convert PNG to JPG with Dramatic Size Reduction
+        </h2>
+        <p class="seo-paragraph">
+            ConvertPixels provides the fastest way to <strong>convert PNG to JPG</strong> while reducing file size by up to 95%. Process up to <strong>20 images at once</strong> with our batch converter—perfect for optimizing website images, email attachments, and saving storage space instantly.
+        </p>
+    </div>
+    
+    <div class="seo-features">
+        <h3 class="seo-subheading center">
+            <span class="icon">🔧</span> Optimized for File Size Reduction
+        </h3>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <h4 class="feature-title">🚀 20-File Batch Limit</h4>
+                <p class="feature-desc">
+                    Stop converting one by one. Upload up to <strong>20 PNG files</strong> simultaneously and watch them convert to compact JPGs in a single click.
+                </p>
             </div>
-            <div class="progress-bar-container">
-                <div class="progress-bar" id="progressBar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Conversion progress"></div>
+            
+            <div class="feature-card feature-card-blue">
+                <h4 class="feature-title">🛡️ Secure Local Conversion</h4>
+                <p class="feature-desc">
+                    Your images stay on your device. We use <strong>browser-based technology</strong> to process your PNGs locally, so your data is never sent to a server.
+                </p>
             </div>
-            <div class="progress-details">
-                <div class="detail-item">
-                    <span>Completed:</span>
-                    <span id="completedCount" aria-live="polite">0</span>
-                </div>
-                <div class="detail-item">
-                    <span>Failed:</span>
-                    <span id="failedCount" aria-live="polite">0</span>
-                </div>
-                <div class="detail-item">
-                    <span>Remaining:</span>
-                    <span id="remainingCount" aria-live="polite">0</span>
-                </div>
-            </div>
-            <div class="modal-buttons">
-                <button id="cancelConversionBtn" class="btn-cancel">Cancel</button>
+            
+            <div class="feature-card feature-card-green">
+                <h4 class="feature-title">💯 No Watermarks</h4>
+                <p class="feature-desc">
+                    Get clean, professional JPG files every time. We never add watermarks or hidden fees to your converted images.
+                </p>
             </div>
         </div>
     </div>
 
-    <div id="zipLoader" style="display:none;">
+    <div style="margin-bottom: 48px;"></div>
+ 
+    <div class="seo-card seo-pro-settings" style="background: rgba(20, 184, 166, 0.05); border: 1px dashed #14b8a6; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
+        <h3 class="seo-subheading">
+            <span class="icon">⚙️</span> JPG Compression Settings & Smart File Size Optimization
+        </h3>
+        <p class="seo-paragraph">
+            ConvertPixels includes two advanced JPG compression modes designed for both professional image quality and ultra-efficient file size reduction. 
+            Choose <strong style="color: #fbbf24; font-weight: 600;">High Quality JPG</strong> to preserve visual detail with near-lossless JPEG compression while still achieving dramatically smaller file sizes compared to PNG — perfect for printing, portfolios, photography, professional editing, and archival use.
+        </p>
+        <p class="seo-paragraph" style="margin-bottom: 0;">
+            Or switch to <strong style="color: #fbbf24; font-weight: 600;">Optimized Size</strong> for stronger JPEG compression and significantly faster loading speeds with only minimal visible quality reduction. Depending on the image, optimized JPG files can become up to <strong style="color: #fbbf24; font-weight: 600;">90% smaller</strong> than PNG images — making them ideal for websites, blogs, social media, email sharing, SEO optimization, and high-performance web experiences across all devices.
+        </p>
+    </div>
+
+    <div class="seo-card seo-large-support" style="background: rgba(20, 184, 166, 0.05); border: 1px dashed #14b8a6; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
+        <h3 class="seo-subheading">
+            <span class="icon">🖼️</span> 10,000×10,000 & 100MP PNG to JPG Converter Support
+        </h3>
+        <p class="seo-paragraph" style="margin-bottom: 0;">
+            Looking for a <strong style="color: #fbbf24; font-weight: 600;">10,000×10,000 PNG to JPG converter</strong> or a tool that can handle <strong style="color: #fbbf24; font-weight: 600;">100MP high-resolution images</strong>? 
+            ConvertPixels is specifically optimized for <strong style="color: #fbbf24; font-weight: 600;">large image conversion</strong>, allowing you to process ultra-HD wallpapers, AI-generated artwork, photography exports, detailed textures, posters, and professional design assets directly in your browser. 
+            Even many mid-range devices can smoothly convert <strong style="color: #fbbf24; font-weight: 600;">massive PNG files into JPG</strong> thanks to our high-performance browser engine — giving you drastically smaller file sizes without sacrificing resolution or detail.
+        </p>
+    </div>
+
+    <div class="seo-card seo-extreme-support" style="background: rgba(249, 115, 22, 0.05); border: 1px dashed #f97316; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
+        <h3 class="seo-subheading">
+            <span class="icon">🚀</span> Convert Even Larger Than 10,000×10,000 & 100MP PNG Images to JPG
+        </h3>
+        <p class="seo-paragraph" style="margin-bottom: 16px;">
+            Need to convert images beyond <strong style="color: #fbbf24; font-weight: 600;">10,000×10,000 resolution</strong> or <strong style="color: #fbbf24; font-weight: 600;">100MP+</strong>? 
+            ConvertPixels is powered by an extremely optimized browser engine designed for handling ultra-large PNG to JPG conversions more efficiently than typical online converters. 
+            <strong style="color: #fbbf24; font-weight: 600;">The maximum image size supported mainly depends on your device's RAM, CPU power, and browser capabilities</strong> — meaning higher-end systems can reliably process even larger photography exports, AI-generated artwork, textures, posters, and ultra-HD graphics while preserving maximum image detail.
+        </p>
+        <p class="seo-paragraph" style="margin-bottom: 0;">
+            Unlike many converters that fail, freeze, or enforce aggressive upload restrictions, ConvertPixels performs all processing locally on your own hardware. 
+            This means there are <strong style="color: #fbbf24; font-weight: 600;">no traditional server-side image limits</strong>, no forced downscaling, and no unnecessary compression during conversion. 
+            The stronger your device specifications are, the larger the PNG images our engine can reliably convert into ultra-efficient JPG files — perfect for saving storage space and faster sharing.
+        </p>
+    </div>
+
+    <div class="seo-card seo-speed-test" style="background: rgba(249, 115, 22, 0.05); border: 1px dashed #f97316; border-radius: 12px; padding: 24px;">
+        <h3 class="seo-subheading">
+            <span class="icon">⚡</span> Fastest PNG to JPG Converter in the World — 36.3 Million Pixels Per Second
+        </h3>
+        <p class="seo-paragraph" style="margin-bottom: 16px;">
+            ConvertPixels is engineered for extreme-performance conversion. In real-world 
+            benchmarks, our engine processed <strong style="color: #fbbf24; font-weight: 600;">2 billion pixels in just 55 seconds</strong> on a standard 4-core consumer PC — 
+            sustaining nearly <strong style="color: #fbbf24; font-weight: 600;">36.3 million pixels per second</strong>.
+        </p>
+        <p class="seo-paragraph" style="margin-bottom: 0;">
+            This is possible because all processing happens locally via 
+            <strong style="color: #fbbf24; font-weight: 600;">multi-threaded Web Workers</strong> using 
+            your own CPU cores directly — no uploads, no server queues, no bottlenecks, 
+            and your images never leave your device.
+        </p>
+    </div>
+
+    <div style="margin-bottom: 48px;"></div>
+    
+    <div class="seo-card seo-how-to">
+        <h3 class="seo-subheading">
+            <span class="icon">📱</span> How to Batch Convert PNG to JPG
+        </h3>
+        
+        <div class="steps-container">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h4 class="step-title">Select 20 PNGs</h4>
+                    <p class="step-desc">Drag and drop your PNG files into the upload zone. You can select up to 20 images for <strong>batch conversion</strong>.</p>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number step-number-blue">2</div>
+                <div class="step-content">
+                    <h4 class="step-title">Choose Quality Setting</h4>
+                    <p class="step-desc">Pick "Maximum Quality" for best visuals or "Optimized Size" for smallest files. Both options create JPGs much smaller than PNG.</p>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number step-number-green">3</div>
+                <div class="step-content">
+                    <h4 class="step-title">Instant Download</h4>
+                    <p class="step-desc">Once converted, your compact JPGs are ready. Download them all instantly—now up to 95% smaller than the original PNGs.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="seo-faq">
+        <h3 class="seo-subheading center">
+            <span class="icon">❓</span> FAQ: PNG to JPG Conversion
+        </h3>
+        
+        <div class="faq-container">
+            <div class="faq-item">
+                <h4 class="faq-question">Will JPG files be smaller than PNG?</h4>
+                <p class="faq-answer">Yes! JPG compression typically reduces PNG file sizes by <strong>80-95%</strong>. A 1MB PNG becomes just 50-200KB as JPG while maintaining great quality.</p>
+            </div>
+            
+            <div class="faq-item">
+                <h4 class="faq-question">Is there any quality loss in PNG to JPG conversion?</h4>
+                <p class="faq-answer">JPG uses efficient compression that discards some data imperceptible to the human eye. At <strong>Maximum Quality</strong> setting, the visual difference is negligible while file size drops dramatically.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4 class="faq-question">Why can't I upload more than 20 files?</h4>
+                <p class="faq-answer">To ensure <strong>maximum speed</strong> and prevent browser crashes on mobile, we've optimized the batch limit to 20 files per session.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="footer-matrix">
+    <div class="matrix-grid">
+        <div class="matrix-column">
+            <h4>JPG Conversions</h4>
+            <a href="https://convertpixels.org/jpg-to-png">JPG to PNG</a>
+            <a href="https://convertpixels.org/jpg-to-webp">JPG to WEBP</a>
+        </div>
+        <div class="matrix-column">
+            <h4>PNG Conversions</h4>
+            <a href="https://convertpixels.org/png-to-jpg" class="active">PNG to JPG</a>
+            <a href="https://convertpixels.org/png-to-webp">PNG to WEBP</a>
+        </div>
+        <div class="matrix-column">
+            <h4>WEBP Conversions</h4>
+            <a href="https://convertpixels.org/webp-to-png">WEBP to PNG</a>
+            <a href="https://convertpixels.org/webp-to-jpg">WEBP to JPG</a>
+        </div>
+        <div class="matrix-column utility-col">
+            <h4>Privacy & Terms</h4>
+            <a href="https://convertpixels.org/privacy-policy">Privacy Policy</a>
+            <a href="https://convertpixels.org/terms-of-service">Terms of Service</a>
+        </div>
+    </div>
+</footer>
+
+<div class="progress-modal" id="progressModal" role="dialog" aria-labelledby="modalTitle" aria-hidden="true">
+    <div class="modal-content">
+        <h3 id="modalTitle">Converting Files</h3>
+        <div class="progress-stats">
+            <span id="progressText" aria-live="polite">Processing 0 of 0</span>
+            <span id="progressPercent" aria-live="polite">0%</span>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progressBar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Conversion progress"></div>
+        </div>
+        <div class="progress-details">
+            <div class="detail-item">
+                <span>Completed:</span>
+                <span id="completedCount" aria-live="polite">0</span>
+            </div>
+            <div class="detail-item">
+                <span>Failed:</span>
+                <span id="failedCount" aria-live="polite">0</span>
+            </div>
+            <div class="detail-item">
+                <span>Remaining:</span>
+                <span id="remainingCount" aria-live="polite">0</span>
+            </div>
+        </div>
+        <div class="modal-buttons">
+            <button id="cancelConversionBtn" class="btn-cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="zipLoader" style="display:none;">
     <div class="loader-card">
         <div class="orange-spinner"></div>
         <p>Bundling your files...</p>
         <small>This will only take a moment.</small>
     </div>
-    </div>
+</div>
 
-    <div id="thumbGuard" role="status" aria-live="polite">
+<div id="thumbGuard" role="status" aria-live="polite">
     <div class="guard-spinner" aria-hidden="true"></div>
     <div style="font-weight: bold; font-size: 1.1rem; letter-spacing: 0.5px;">
         Preparing Images...
@@ -330,11 +380,10 @@
     <div style="font-size: 0.85rem; color: #bbb; margin-top: 5px;">
         Optimizing previews for high-speed conversion.
     </div>
-    </div>
+</div>
 
-    <!-- Alert Container -->
-    <div class="alert-container" id="alertContainer" role="alert" aria-live="assertive"></div>
+<div class="alert-container" id="alertContainer" role="alert" aria-live="assertive"></div>
 
-    <script src="/png-to-jpg/script.js" defer></script>
+<script src="/png-to-jpg/script.js" defer></script>
 </body>
 </html>
