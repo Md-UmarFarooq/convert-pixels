@@ -11,6 +11,10 @@ let isConverting = false;
 // Track active thumbnail generation tasks
 let pendingThumbnails = 0;
 
+const IS_MOBILE = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const PIXEL_THRESHOLD = IS_MOBILE ? 3000 * 3000 : 5000 * 5000;
+let hasShownLargeImageAlert = false;
+
 let totalPixelsInBatch = 0;
 let fileContributions = {};
 let animationFrame = null;
@@ -117,37 +121,76 @@ function handleFileSelect(event, fileInput) {
 
 async function getFileWeight(file) {
     if (file.pixelWeight) return file.pixelWeight;
-    return new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => {
-            file.pixelWeight = img.width * img.height;
-            URL.revokeObjectURL(img.src);
-            resolve(file.pixelWeight);
-        };
-        img.onerror = () => {
-            file.pixelWeight = 1000000; // Fallback for corrupt files
-            resolve(1000000);
-        };
-        img.src = URL.createObjectURL(file);
-    });
+
+    // Fast-path: WebP header parser
+    try {
+        const buffer = await file.slice(0, 30).arrayBuffer();
+        const view = new DataView(buffer);
+
+        // Check RIFF signature and 'WEBP' identifier
+        if (view.getUint32(0) !== 0x52494646 || view.getUint32(8) !== 0x57454250) {
+            throw new Error("Not WebP");
+        }
+
+        // Check for Simple WebP (VP8 or VP8L)
+        const chunkFourCC = view.getUint32(12);
+        
+        // VP8 (Lossy): Dimensions at bytes 24-27
+        if (chunkFourCC === 0x56503820) { 
+            const bits = view.getUint32(24, true);
+            file.width = (bits & 0x3FFF);      
+            file.height = ((bits >> 14) & 0x3FFF);
+            file.pixelWeight = (bits & 0x3FFF) * ((bits >> 14) & 0x3FFF);
+            return file.pixelWeight;
+        }
+        
+        // VP8L (Lossless): Dimensions at bytes 21-24
+        if (chunkFourCC === 0x5650384C) { 
+            const b1 = view.getUint8(21);
+            const b2 = view.getUint8(22);
+            const b3 = view.getUint8(23);
+            const b4 = view.getUint8(24);
+            file.width = 1 + (((b2 & 0x3F) << 8) | b1);       
+            file.height = 1 + (((b4 & 0xF) << 10) | (b3 << 2) | ((b2 & 0xC0) >> 6)); 
+            file.pixelWeight =file.width*file.height;
+            return file.pixelWeight;
+        }
+        
+        throw new Error("Unsupported WebP type");
+    } catch (e) {
+        // Fallback: Original Image logic (Reliable)
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                file.width = img.width;      
+                file.height = img.height;    
+                file.pixelWeight = img.width * img.height;
+                URL.revokeObjectURL(img.src);
+                resolve(file.pixelWeight);
+            };
+            img.onerror = () => {
+                file.pixelWeight = 1000000;
+                resolve(1000000);
+            };
+            img.src = URL.createObjectURL(file);
+        });
+    }
 }
 
 // ============ HANDLE NEW FILES ============
-function handleNewFiles(newFiles, fileInput) {
+async function handleNewFiles(newFiles, fileInput) {
     let addedCount = 0;
     let duplicateCount = 0;
     let limitReachedCount = 0;
 
-    // Process ALL dropped files one by one
+    // 1. Pre-filter files to respect maxFiles limit and duplicates
+    // We determine exactly which files will be added before doing any async work
+    const filesToProcess = [];
     newFiles.forEach(file => {
         const result = validateFile(file);
-
         if (result.isValid) {
-            // Only add if there is a physical slot available
-            if (selectedFiles.length < maxFiles) {
-                selectedFiles.push(file);
-                getFileWeight(file);
-                addedCount++;
+            if (selectedFiles.length + filesToProcess.length < maxFiles) {
+                filesToProcess.push(file);
             } else {
                 limitReachedCount++;
             }
@@ -155,8 +198,34 @@ function handleNewFiles(newFiles, fileInput) {
             duplicateCount++;
         }
     });
+
+    if (filesToProcess.length === 0) {
+        // Still report the errors even if no files were added
+        if (duplicateCount > 0) showError(`${duplicateCount} duplicate file${duplicateCount === 1 ? '' : 's'} ignored`);
+        if (limitReachedCount > 0) showError(`Limit reached: ${limitReachedCount} extra file${limitReachedCount === 1 ? '' : 's'} ignored`);
+        return;
+    }
+
+    // 2. Calculate weights in PARALLEL while preserving ORDER
+    // map() ensures the resulting array matches the order of filesToProcess
+    const processedFiles = await Promise.all(filesToProcess.map(async (file) => {
+        const weight = await getFileWeight(file);
+        file.pixelWeight = weight; // Ensure weight is stored
+        file.isLarge = weight > PIXEL_THRESHOLD;
+        return file;
+    }));
+
+    // 3. Atomically add to global state
+    processedFiles.forEach(file => {
+        if (file.isLarge && !hasShownLargeImageAlert) {
+            showError("Preview for large images is disabled for better performance.");
+            hasShownLargeImageAlert = true;
+        }
+        selectedFiles.push(file);
+        addedCount++;
+    });
     
-    // Update UI if files were added
+    // 4. Update UI
     if (addedCount > 0) {
         updateFilePreviews();
         updateFileCount();
@@ -165,17 +234,9 @@ function handleNewFiles(newFiles, fileInput) {
         showMessage(addedCount === 1 ? `Added 1 file` : `Added ${addedCount} files`);
     }
 
-    // Report Duplicates (ONE message for all of them)
-    if (duplicateCount > 0) {
-        showError(duplicateCount === 1 
-            ? `1 duplicate file ignored` 
-            : `${duplicateCount} duplicate files ignored`);
-    }
-
-    // Report Limit Overflow
-    if (limitReachedCount > 0) {
-        showError(`Limit reached: ${limitReachedCount} extra files ignored (max ${maxFiles})`);
-    }
+    // Report errors at the end
+    if (duplicateCount > 0) showError(`${duplicateCount} duplicate file${duplicateCount === 1 ? '' : 's'} ignored`);
+    if (limitReachedCount > 0) showError(`Limit reached: ${limitReachedCount} extra file${limitReachedCount === 1 ? '' : 's'} ignored`);
 }
 
 // ============ VALIDATE SINGLE FILE ============
@@ -276,7 +337,14 @@ function createFileCard(file, index) {
     };
 
     // Generate preview in background
-    generatePreviewThumbnail(file, imgElement, loader, iconElement);
+    if (file.isLarge) {
+        // Large image: Do not call generatePreviewThumbnail. 
+        // The Thumbnail Guard will NEVER see this file, so it won't wait for it.
+        updateLargeImageCardUI(index,file); 
+    } else {
+        // Normal image: Works exactly as before.
+        generatePreviewThumbnail(file, imgElement, loader, iconElement);
+    }
 
     // Remove Logic
     card.querySelector('.remove-file').addEventListener('click', (e) => {
@@ -300,6 +368,28 @@ function createFileCard(file, index) {
     });
     
     return card;
+}
+
+function updateLargeImageCardUI(index, file) {
+    const w = file.width || "0";
+    const h = file.height || "0";
+
+    // Delay ensures the DOM element exists before querying
+    setTimeout(() => {
+        const card = document.querySelector(`.preview-card[data-index="${index}"]`);
+        if (!card) return;
+
+        const previewArea = card.querySelector('.thumbnail-container');
+        if (!previewArea) return;
+
+        // Render the high-resolution placeholder
+        previewArea.innerHTML = `
+            <div class="hi-res-card">
+                <div class="hi-res-title">HIGH<br>RESOLUTION</div>
+                <div class="hi-res-dims">${w} × ${h}</div>
+            </div>
+        `;
+    }, 100);
 }
 
 async function generatePreviewThumbnail(file, imgElement, loaderElement) {
