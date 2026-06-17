@@ -11,6 +11,10 @@ let isConverting = false;
 // Track active thumbnail generation tasks
 let pendingThumbnails = 0;
 
+const IS_MOBILE = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const PIXEL_THRESHOLD = IS_MOBILE ? 3000 * 3000 : 5000 * 5000;
+let hasShownLargeImageAlert = false;
+
 let totalPixelsInBatch = 0;
 let fileContributions = {};
 let animationFrame = null;
@@ -117,37 +121,60 @@ function handleFileSelect(event, fileInput) {
 
 async function getFileWeight(file) {
     if (file.pixelWeight) return file.pixelWeight;
-    return new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => {
-            file.pixelWeight = img.width * img.height;
-            URL.revokeObjectURL(img.src);
-            resolve(file.pixelWeight);
-        };
-        img.onerror = () => {
-            file.pixelWeight = 1000000; // Fallback for corrupt files
-            resolve(1000000);
-        };
-        img.src = URL.createObjectURL(file);
-    });
+
+    // Fast-path: Binary search for PNG dimensions
+    try {
+        const buffer = await file.slice(0, 100).arrayBuffer();
+        const view = new DataView(buffer);
+
+        // Standard PNG Signature
+        if (view.getUint32(0) === 0x89504E47 && view.getUint32(4) === 0x0D0A1A0A) {
+            let offset = 8;
+            while (offset < view.byteLength - 12) {
+                if (view.getUint32(offset + 4) === 0x49484452) { // 'IHDR'
+                    file.width = view.getUint32(offset + 8);   
+                    file.height = view.getUint32(offset + 12);
+                    file.pixelWeight = view.getUint32(offset + 8) * view.getUint32(offset + 12);
+                    return file.pixelWeight;
+                }
+                offset += view.getUint32(offset) + 12; // Jump to next chunk
+            }
+        }
+        throw new Error("IHDR not found");
+    } catch (e) {
+        // Fallback: Original logic (Slow-path)
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                file.width = img.width;     
+                file.height = img.height;
+                file.pixelWeight = img.width * img.height;
+                URL.revokeObjectURL(img.src);
+                resolve(file.pixelWeight);
+            };
+            img.onerror = () => {
+                file.pixelWeight = 1000000;
+                resolve(1000000);
+            };
+            img.src = URL.createObjectURL(file);
+        });
+    }
 }
 
 // ============ HANDLE NEW FILES ============
-function handleNewFiles(newFiles, fileInput) {
+async function handleNewFiles(newFiles, fileInput) {
     let addedCount = 0;
     let duplicateCount = 0;
     let limitReachedCount = 0;
 
-    // Process ALL dropped files one by one
+    // 1. Pre-filter files to respect maxFiles limit and duplicates
+    // We determine exactly which files will be added before doing any async work
+    const filesToProcess = [];
     newFiles.forEach(file => {
         const result = validateFile(file);
-
         if (result.isValid) {
-            // Only add if there is a physical slot available
-            if (selectedFiles.length < maxFiles) {
-                selectedFiles.push(file);
-                getFileWeight(file);
-                addedCount++;
+            if (selectedFiles.length + filesToProcess.length < maxFiles) {
+                filesToProcess.push(file);
             } else {
                 limitReachedCount++;
             }
@@ -155,8 +182,34 @@ function handleNewFiles(newFiles, fileInput) {
             duplicateCount++;
         }
     });
+
+    if (filesToProcess.length === 0) {
+        // Still report the errors even if no files were added
+        if (duplicateCount > 0) showError(`${duplicateCount} duplicate file${duplicateCount === 1 ? '' : 's'} ignored`);
+        if (limitReachedCount > 0) showError(`Limit reached: ${limitReachedCount} extra file${limitReachedCount === 1 ? '' : 's'} ignored`);
+        return;
+    }
+
+    // 2. Calculate weights in PARALLEL while preserving ORDER
+    // map() ensures the resulting array matches the order of filesToProcess
+    const processedFiles = await Promise.all(filesToProcess.map(async (file) => {
+        const weight = await getFileWeight(file);
+        file.pixelWeight = weight; // Ensure weight is stored
+        file.isLarge = weight > PIXEL_THRESHOLD;
+        return file;
+    }));
+
+    // 3. Atomically add to global state
+    processedFiles.forEach(file => {
+        if (file.isLarge && !hasShownLargeImageAlert) {
+            showError("Preview for large images is disabled for better performance.");
+            hasShownLargeImageAlert = true;
+        }
+        selectedFiles.push(file);
+        addedCount++;
+    });
     
-    // Update UI if files were added
+    // 4. Update UI
     if (addedCount > 0) {
         updateFilePreviews();
         updateFileCount();
@@ -165,17 +218,9 @@ function handleNewFiles(newFiles, fileInput) {
         showMessage(addedCount === 1 ? `Added 1 file` : `Added ${addedCount} files`);
     }
 
-    // Report Duplicates (ONE message for all of them)
-    if (duplicateCount > 0) {
-        showError(duplicateCount === 1 
-            ? `1 duplicate file ignored` 
-            : `${duplicateCount} duplicate files ignored`);
-    }
-
-    // Report Limit Overflow
-    if (limitReachedCount > 0) {
-        showError(`Limit reached: ${limitReachedCount} extra files ignored (max ${maxFiles})`);
-    }
+    // Report errors at the end
+    if (duplicateCount > 0) showError(`${duplicateCount} duplicate file${duplicateCount === 1 ? '' : 's'} ignored`);
+    if (limitReachedCount > 0) showError(`Limit reached: ${limitReachedCount} extra file${limitReachedCount === 1 ? '' : 's'} ignored`);
 }
 
 // ============ VALIDATE SINGLE FILE ============
@@ -276,7 +321,14 @@ function createFileCard(file, index) {
     };
 
     // Generate preview in background
-    generatePreviewThumbnail(file, imgElement, loader, iconElement);
+    if (file.isLarge) {
+        // Large image: Do not call generatePreviewThumbnail. 
+        // The Thumbnail Guard will NEVER see this file, so it won't wait for it.
+        updateLargeImageCardUI(index,file); 
+    } else {
+        // Normal image: Works exactly as before.
+        generatePreviewThumbnail(file, imgElement, loader, iconElement);
+    }
 
     // Remove Logic
     card.querySelector('.remove-file').addEventListener('click', (e) => {
@@ -302,31 +354,63 @@ function createFileCard(file, index) {
     return card;
 }
 
+function updateLargeImageCardUI(index, file) {
+    const w = file.width || "0";
+    const h = file.height || "0";
+
+    // Delay ensures the DOM element exists before querying
+    setTimeout(() => {
+        const card = document.querySelector(`.preview-card[data-index="${index}"]`);
+        if (!card) return;
+
+        const previewArea = card.querySelector('.thumbnail-container');
+        if (!previewArea) return;
+
+        // Render the high-resolution placeholder
+        previewArea.innerHTML = `
+            <div class="hi-res-card">
+                <div class="hi-res-title">HIGH<br>RESOLUTION</div>
+                <div class="hi-res-dims">${w} × ${h}</div>
+            </div>
+        `;
+    }, 100);
+}
+
 async function generatePreviewThumbnail(file, imgElement, loaderElement) {
-    pendingThumbnails++; // ⬆️ Task started
+    pendingThumbnails++; 
     try {
-        // High-performance decoding to limit memory footprint
+        // 1. High-performance decoding
         const bitmap = await createImageBitmap(file, { 
             resizeWidth: 300, 
+            resizeHeight: 300,
             resizeQuality: 'low' 
         });
 
+        // 2. Local canvas creation (Crucial for parallel execution)
+        // Creating this locally ensures one doesn't block the other
         const canvas = document.createElement('canvas');
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(bitmap, 0, 0);
+        canvas.width = 300;
+        canvas.height = 300;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        
+        // 3. Draw
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, 300, 300);
+        ctx.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height);
 
-        imgElement.src = canvas.toDataURL('image/jpeg', 0.6); // Lower quality for preview speed
+        // 4. Convert
+        imgElement.src = canvas.toDataURL('image/jpeg', 0.6);
         imgElement.style.display = 'block';
         if (loaderElement) loaderElement.style.display = 'none';
 
+        // 5. Cleanup
         bitmap.close();
+        // Browser will garbage collect the local 'canvas' automatically 
+        // as soon as it goes out of scope after the function ends.
     } catch (err) {
-        // Fallback for massive or corrupt images
         if (loaderElement) loaderElement.textContent = "Preview unavailable";
     } finally {
-        pendingThumbnails--; // ⬇️ Task finished (always executes)
+        pendingThumbnails--;
     }
 }
 
