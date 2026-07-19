@@ -169,8 +169,11 @@ async function getFileWeight(file) {
                 resolve(file.pixelWeight);
             };
             img.onerror = () => {
-                file.pixelWeight = 1000000;
-                resolve(1000000);
+                URL.revokeObjectURL(img.src);
+                file.pixelWeight = -1; // Use -1 as the error flag
+                file.width = 0;
+                file.height = 0;
+                resolve(-1);
             };
             img.src = URL.createObjectURL(file);
         });
@@ -337,7 +340,7 @@ function createFileCard(file, index) {
     };
 
     // Generate preview in background
-    if (file.isLarge) {
+    if (file.isLarge || file.pixelWeight === -1) {
         // Large image: Do not call generatePreviewThumbnail. 
         // The Thumbnail Guard will NEVER see this file, so it won't wait for it.
         updateLargeImageCardUI(index,file); 
@@ -371,9 +374,6 @@ function createFileCard(file, index) {
 }
 
 function updateLargeImageCardUI(index, file) {
-    const w = file.width || "0";
-    const h = file.height || "0";
-
     // Delay ensures the DOM element exists before querying
     setTimeout(() => {
         const card = document.querySelector(`.preview-card[data-index="${index}"]`);
@@ -382,13 +382,25 @@ function updateLargeImageCardUI(index, file) {
         const previewArea = card.querySelector('.thumbnail-container');
         if (!previewArea) return;
 
-        // Render the high-resolution placeholder
-        previewArea.innerHTML = `
-            <div class="hi-res-card">
-                <div class="hi-res-title">HIGH<br>RESOLUTION</div>
-                <div class="hi-res-dims">${w} × ${h}</div>
-            </div>
-        `;
+        // Check if this is a header error (indicated by -1) or a standard large image
+        if (file.pixelWeight === -1) {
+            previewArea.innerHTML = `
+                <div class="hi-res-card error-state">
+                    <div class="hi-res-title">❌ Invalid File</div>
+                    <div class="hi-res-dims">Cannot read image</div>
+                </div>
+            `;
+        } else {
+            const w = file.width || "0";
+            const h = file.height || "0";
+            // Standard high-resolution placeholder
+            previewArea.innerHTML = `
+                <div class="hi-res-card">
+                    <div class="hi-res-title">HIGH<br>RESOLUTION</div>
+                    <div class="hi-res-dims">${w} × ${h}</div>
+                </div>
+            `;
+        }
     }, 100);
 }
 
