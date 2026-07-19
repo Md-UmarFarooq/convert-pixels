@@ -153,8 +153,11 @@ async function getFileWeight(file) {
                 resolve(file.pixelWeight);
             };
             img.onerror = () => {
-                file.pixelWeight = 1000000;
-                resolve(1000000);
+                URL.revokeObjectURL(img.src);
+                file.pixelWeight = -1; // Use -1 as the error flag
+                file.width = 0;
+                file.height = 0;
+                resolve(-1);
             };
             img.src = URL.createObjectURL(file);
         });
@@ -321,7 +324,7 @@ function createFileCard(file, index) {
     };
 
     // Generate preview in background
-    if (file.isLarge) {
+    if (file.isLarge || file.pixelWeight === -1) {
         // Large image: Do not call generatePreviewThumbnail. 
         // The Thumbnail Guard will NEVER see this file, so it won't wait for it.
         updateLargeImageCardUI(index,file); 
@@ -355,9 +358,6 @@ function createFileCard(file, index) {
 }
 
 function updateLargeImageCardUI(index, file) {
-    const w = file.width || "0";
-    const h = file.height || "0";
-
     // Delay ensures the DOM element exists before querying
     setTimeout(() => {
         const card = document.querySelector(`.preview-card[data-index="${index}"]`);
@@ -366,51 +366,53 @@ function updateLargeImageCardUI(index, file) {
         const previewArea = card.querySelector('.thumbnail-container');
         if (!previewArea) return;
 
-        // Render the high-resolution placeholder
-        previewArea.innerHTML = `
-            <div class="hi-res-card">
-                <div class="hi-res-title">HIGH<br>RESOLUTION</div>
-                <div class="hi-res-dims">${w} × ${h}</div>
-            </div>
-        `;
+        // Check if this is a header error (indicated by -1) or a standard large image
+        if (file.pixelWeight === -1) {
+            previewArea.innerHTML = `
+                <div class="hi-res-card error-state">
+                    <div class="hi-res-title">❌ Invalid File</div>
+                    <div class="hi-res-dims">Cannot read image</div>
+                </div>
+            `;
+        } else {
+            const w = file.width || "0";
+            const h = file.height || "0";
+            // Standard high-resolution placeholder
+            previewArea.innerHTML = `
+                <div class="hi-res-card">
+                    <div class="hi-res-title">HIGH<br>RESOLUTION</div>
+                    <div class="hi-res-dims">${w} × ${h}</div>
+                </div>
+            `;
+        }
     }, 100);
 }
 
 async function generatePreviewThumbnail(file, imgElement, loaderElement) {
-    pendingThumbnails++; 
+    pendingThumbnails++; // ⬆️ Task started
     try {
-        // 1. High-performance decoding
+        // High-performance decoding to limit memory footprint
         const bitmap = await createImageBitmap(file, { 
             resizeWidth: 300, 
-            resizeHeight: 300,
             resizeQuality: 'low' 
         });
 
-        // 2. Local canvas creation (Crucial for parallel execution)
-        // Creating this locally ensures one doesn't block the other
         const canvas = document.createElement('canvas');
-        canvas.width = 300;
-        canvas.height = 300;
-        const ctx = canvas.getContext('2d', { alpha: false });
-        
-        // 3. Draw
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, 300, 300);
-        ctx.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height);
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0);
 
-        // 4. Convert
-        imgElement.src = canvas.toDataURL('image/jpeg', 0.6);
+        imgElement.src = canvas.toDataURL('image/jpeg', 0.6); // Lower quality for preview speed
         imgElement.style.display = 'block';
         if (loaderElement) loaderElement.style.display = 'none';
 
-        // 5. Cleanup
         bitmap.close();
-        // Browser will garbage collect the local 'canvas' automatically 
-        // as soon as it goes out of scope after the function ends.
     } catch (err) {
+        // Fallback for massive or corrupt images
         if (loaderElement) loaderElement.textContent = "Preview unavailable";
     } finally {
-        pendingThumbnails--;
+        pendingThumbnails--; // ⬇️ Task finished (always executes)
     }
 }
 
