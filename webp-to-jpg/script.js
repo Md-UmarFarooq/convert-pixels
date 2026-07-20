@@ -124,7 +124,7 @@ async function getFileWeight(file) {
 
     // Fast-path: WebP header parser
     try {
-        const buffer = await file.slice(0, 30).arrayBuffer();
+        const buffer = await file.slice(0, 50).arrayBuffer();
         const view = new DataView(buffer);
 
         // Check RIFF signature and 'WEBP' identifier
@@ -132,13 +132,24 @@ async function getFileWeight(file) {
             throw new Error("Not WebP");
         }
 
-        // Check for Simple WebP (VP8 or VP8L)
+        // Check for WebP chunk type (VP8X, VP8, or VP8L)
         const chunkFourCC = view.getUint32(12);
         
+        // VP8X (Extended): Dimensions at bytes 24-29
+        if (chunkFourCC === 0x56503858) {
+            const widthMinusOne = view.getUint16(24, true) | (view.getUint8(26) << 16);
+            const heightMinusOne = view.getUint16(27, true) | (view.getUint8(29) << 16);
+            
+            file.width = widthMinusOne + 1;
+            file.height = heightMinusOne + 1;
+            file.pixelWeight = file.width * file.height;
+            return file.pixelWeight;
+        }
+
         // VP8 (Lossy): Dimensions at bytes 24-27
         if (chunkFourCC === 0x56503820) { 
             const bits = view.getUint32(24, true);
-            file.width = (bits & 0x3FFF);         
+            file.width = (bits & 0x3FFF);        
             file.height = ((bits >> 14) & 0x3FFF);
             file.pixelWeight = (bits & 0x3FFF) * ((bits >> 14) & 0x3FFF);
             return file.pixelWeight;
@@ -150,7 +161,7 @@ async function getFileWeight(file) {
             const b2 = view.getUint8(22);
             const b3 = view.getUint8(23);
             const b4 = view.getUint8(24);
-            file.width = 1 + (((b2 & 0x3F) << 8) | b1);       
+            file.width = 1 + (((b2 & 0x3F) << 8) | b1);      
             file.height = 1 + (((b4 & 0xF) << 10) | (b3 << 2) | ((b2 & 0xC0) >> 6)); 
             file.pixelWeight = file.width * file.height;
             return file.pixelWeight;
