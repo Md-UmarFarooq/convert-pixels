@@ -122,31 +122,36 @@ function handleFileSelect(event, fileInput) {
 async function getFileWeight(file) {
     if (file.pixelWeight) return file.pixelWeight;
 
-    // Fast-path: Binary search for PNG dimensions
+    // Fast-path: PNG chunk header parser (First 33 bytes cover the mandatory IHDR chunk right after the 8-byte signature)
     try {
-        const buffer = await file.slice(0, 100).arrayBuffer();
+        const buffer = await file.slice(0, 33).arrayBuffer();
         const view = new DataView(buffer);
 
-        // Standard PNG Signature
-        if (view.getUint32(0) === 0x89504E47 && view.getUint32(4) === 0x0D0A1A0A) {
-            let offset = 8;
-            while (offset < view.byteLength - 12) {
-                if (view.getUint32(offset + 4) === 0x49484452) { // 'IHDR'
-                    file.width = view.getUint32(offset + 8);   
-                    file.height = view.getUint32(offset + 12);
-                    file.pixelWeight = view.getUint32(offset + 8) * view.getUint32(offset + 12);
-                    return file.pixelWeight;
-                }
-                offset += view.getUint32(offset) + 12; // Jump to next chunk
-            }
+        // Standard PNG 8-byte signature
+        if (view.getUint32(0) !== 0x89504E47 || view.getUint32(4) !== 0x0D0A1A0A) {
+            throw new Error("Not PNG");
         }
-        throw new Error("IHDR not found");
+
+        // In a valid PNG, the IHDR chunk is *always* the very first chunk starting right at byte offset 8.
+        // Length (4 bytes at offset 8) is always 13, Chunk Type (4 bytes at offset 12) is 'IHDR' (0x49484452).
+        if (view.getUint32(8) !== 13 || view.getUint32(12) !== 0x49484452) {
+            throw new Error("Invalid PNG: IHDR must be first chunk");
+        }
+
+        // Width is at offset 16, Height is at offset 20 (both 4-byte big-endian integers)
+        const width = view.getUint32(16);
+        const height = view.getUint32(20);
+
+        file.width = width;  
+        file.height = height;
+        file.pixelWeight = width * height;
+        return file.pixelWeight;
     } catch (e) {
         // Fallback: Original logic (Slow-path)
         return new Promise(resolve => {
             const img = new Image();
             img.onload = () => {
-                file.width = img.width;     
+                file.width = img.width;      
                 file.height = img.height;
                 file.pixelWeight = img.width * img.height;
                 URL.revokeObjectURL(img.src);
