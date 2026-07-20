@@ -122,9 +122,9 @@ function handleFileSelect(event, fileInput) {
 async function getFileWeight(file) {
     if (file.pixelWeight) return file.pixelWeight;
 
-    // Fast-path: JPEG SOF marker search (First 2KB covers almost all JPEGs)
+    // Fast-path: JPEG SOF marker search (First 32KB covers heavy EXIF, ICC profiles, and camera maker notes)
     try {
-        const buffer = await file.slice(0, 2048).arrayBuffer();
+        const buffer = await file.slice(0, 32768).arrayBuffer();
         const view = new DataView(buffer);
 
         // Check for JPEG SOI marker (0xFFD8)
@@ -134,10 +134,19 @@ async function getFileWeight(file) {
         while (offset < view.byteLength - 8) {
             const marker = view.getUint16(offset);
             
-            // Markers: 0xFFC0 (Baseline), 0xFFC1 (Extended), 0xFFC2 (Progressive)
+            // Check if it's a valid marker byte starting with 0xFF
             if ((marker & 0xFF00) === 0xFF00) {
                 const type = marker & 0x00FF;
-                if (type >= 0xC0 && type <= 0xC3) {
+                
+                // Standalone markers that do not have a length field following them
+                // 0xD8 (SOI), 0xD9 (EOI), 0x01 (TEM), 0xD0-0xD7 (RST0-RST7)
+                if (type === 0xD8 || type === 0xD9 || type === 0x01 || (type >= 0xD0 && type <= 0xD7)) {
+                    offset += 1;
+                    continue;
+                }
+
+                // SOF markers: 0xFFC0 to 0xFFCF (excluding arithmetic coding 0xFFC4, 0xFFCC, 0xFFCD)
+                if (type >= 0xC0 && type <= 0xCF && type !== 0xC4 && type !== 0xCC && type !== 0xCD) {
                     // Found SOF marker: height at offset + 5, width at offset + 7
                     const height = view.getUint16(offset + 5);
                     const width = view.getUint16(offset + 7);
@@ -146,9 +155,13 @@ async function getFileWeight(file) {
                     file.height = height;
                     return file.pixelWeight;
                 }
-                // Skip to next segment
-                offset += 2 + view.getUint16(offset + 2);
+                
+                // Skip safely to the next segment using its explicit length descriptor (big-endian 16-bit)
+                const segmentLength = view.getUint16(offset + 2);
+                if (segmentLength < 2) break; // Invalid segment layout protection
+                offset += 2 + segmentLength;
             } else {
+                // Handle padding bytes or alignment anomalies commonly found in corrupt/malformed JPEGs
                 offset++;
             }
         }
