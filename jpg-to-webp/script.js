@@ -428,7 +428,7 @@ async function generatePreviewThumbnail(file, imgElement, loaderElement) {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(bitmap, 0, 0);
 
-        imgElement.src = canvas.toDataURL('image/jpeg', 0.6); // Lower quality for preview speed
+        imgElement.src = canvas.toDataURL('image/webp', 0.6); // Lower quality for preview speed with transparency support
         imgElement.style.display = 'block';
         if (loaderElement) loaderElement.style.display = 'none';
 
